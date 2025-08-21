@@ -48,7 +48,7 @@
 /**
  * @brief GPIO类的库实现
  */
-class pyro_gpio_lib_impl_t : public GpioIntf
+class pyro_gpio_lib_impl_t : public IGpio
 {
   public:
     pyro_gpio_lib_impl_t(GpioPortEnum port, GpioPinEnum pin, GpioModeEnum mode);
@@ -60,10 +60,10 @@ class pyro_gpio_lib_impl_t : public GpioIntf
     GpioErrCode toggle() override;
 
   private:
-    using GpioIntf::_gpioRegAddr;
-    using GpioIntf::_mode;
-    using GpioIntf::_pin;
-    using GpioIntf::_port;
+    using IGpio::_gpioRegAddr;
+    using IGpio::_mode;
+    using IGpio::_pin;
+    using IGpio::_port;
     uint32_t pinRaw = 0;
 };
 
@@ -72,10 +72,10 @@ class pyro_gpio_lib_impl_t : public GpioIntf
  */
 class gpio_lib_fcty_impl_t : public GpioFctyIntf
 {
-    std::variant<GpioIntf *, GpioErrCode>
+    std::variant<IGpio *, GpioErrCode>
     produce(GpioPortEnum port, GpioPinEnum pin, GpioModeEnum mode) override
     {
-        GpioIntf *g = new pyro_gpio_lib_impl_t(port, pin, mode);
+        IGpio *g = new pyro_gpio_lib_impl_t(port, pin, mode);
         if (g == nullptr)
         {
             return GpioErrCode::GPIO_MEM_ALLOC_FAILED;
@@ -138,7 +138,7 @@ GpioErrCode pyro_gpio_lib_impl_t::enable()
         return GpioErrCode::GPIO_ERR_NONE;
     }
 
-    switch (GpioIntf::_port)
+    switch (IGpio::_port)
     {
         case GpioPortEnum::GPIO_PORT_A:
         {

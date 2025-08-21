@@ -201,7 +201,7 @@ enum class GpioErrCode {
  * layer can use.
  *
  */
-class GpioIntf
+class IGpio
 {
   public:
     /**
@@ -238,7 +238,7 @@ class GpioIntf
      */
     [[nodiscard]] virtual GpioErrCode toggle()                           = 0;
 
-    virtual ~GpioIntf() = default;
+    virtual ~IGpio() = default;
 
     /****************** setter & getter *******************/
 
@@ -303,7 +303,7 @@ class GpioFctyIntf
      * @param mode
      * @return
      */
-    [[nodiscard]] virtual std::variant<GpioIntf *, GpioErrCode>
+    [[nodiscard]] virtual std::variant<IGpio *, GpioErrCode>
     produce(GpioPortEnum port, GpioPinEnum pin, GpioModeEnum mode) = 0;
 };
 
@@ -319,7 +319,7 @@ class GpioFctyIntf
  * inheritance
  *
  */
-class GpioExtiDecorator final : public GpioIntf
+class GpioExtiDecorator final : public IGpio
 {
   public:
     static uint8_t a;
@@ -356,7 +356,7 @@ class GpioExtiDecorator final : public GpioIntf
      * @brief
      * @note explicit keyword prohibits implicit type conversion
      */
-    explicit GpioExtiDecorator(GpioIntf *gpio)
+    explicit GpioExtiDecorator(IGpio *gpio)
     {
         this->_gpio = gpio;
     }
@@ -386,7 +386,7 @@ class GpioExtiDecorator final : public GpioIntf
 
 
   private:
-    GpioIntf *_gpio;             // decorated GPIO object
+    IGpio *_gpio;             // decorated GPIO object
     std::function<void()> _callback; // callback function
     static std::function<void()> _exti_cb[16];
 };

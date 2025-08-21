@@ -40,7 +40,20 @@ add_executable(${CMAKE_PROJECT_NAME}
         Drivers/Peripheral/GPIO/gpio-reg-impl.cpp
         Drivers/Peripheral/GPIO/gpio-lib-impl.cpp
         Core/Src/freertos.cpp
-        Applications/app-intf.h)
+        Applications/app-intf.h
+        Applications/app-shell.cpp
+        Drivers/Communications/comm-intf.h
+        Drivers/Communications/comm-uart-impl.cpp
+        Drivers/Communications/comm-cdc-impl.cpp
+        Middlewares/Third_Party/LetterShell/shell.c
+        Middlewares/Third_Party/LetterShell/shell_cmd_list.c
+        Middlewares/Third_Party/LetterShell/shell_companion.c
+        Middlewares/Third_Party/LetterShell/shell_ext.c
+        Middlewares/Third_Party/LetterShell/shell_cpp.h
+        Middlewares/Third_Party/LetterShell/log/log.h
+        Middlewares/Third_Party/LetterShell/log.c
+        Applications/app-file.cpp
+)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)

@@ -27,6 +27,8 @@
 /* USER CODE BEGIN Includes */
 #include "usb_device.h"
 #include "../../Drivers/Peripheral/GPIO/gpio-intf.hpp"
+#include "../../Applications/app-intf.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -58,7 +60,9 @@ const osThreadAttr_t defaultTask_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-
+extern "C" {
+  void MX_FREERTOS_Init(void);
+}
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
@@ -94,7 +98,7 @@ void MX_FREERTOS_Init(void) {
   /* Create the thread(s) */
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
-
+  _p_shell_thread->start();
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -116,9 +120,9 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
   MX_USB_DEVICE_Init();
-  GpioIntf *g;
+  IGpio *g;
   auto r = p_gpio_reg_fcty->produce(GpioPortEnum::GPIO_PORT_C, GpioPinEnum::GPIO_PIN_1_, GpioModeEnum::GPIO_MODE_OUTPUT_PP_);
-  g = std::get<GpioIntf*>(r);
+  g = std::get<IGpio*>(r);
 
   auto s = g->enable();
 
