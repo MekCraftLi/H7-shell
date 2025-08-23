@@ -42,12 +42,12 @@
 /**
  * @brief Error Code of communicate interface.
  */
-enum class CommErr{
-  COMM_ERR_NONE,
-  COMM_ERR_TIMEOUT,
-  COMM_ERR_BUSY,
-  COMM_ERR_INVALID,
-  COMM_SUCCESS,
+enum class CommErr {
+    COMM_ERR_NONE,
+    COMM_ERR_TIMEOUT,
+    COMM_ERR_BUSY,
+    COMM_ERR_INVALID,
+    COMM_SUCCESS,
 };
 
 
@@ -56,22 +56,25 @@ enum class CommErr{
 /*-------- 3. interface ---------------------------------------------------------------------------------------------*/
 
 class IComm {
-public:
-  virtual ~IComm() = default;
+  public:
+    virtual ~IComm()                                         = default;
 
-  virtual CommErr configure() = 0;
+    virtual CommErr configure()                              = 0;
 
-  virtual CommErr transmit(uint8_t*msg, std::size_t size) = 0;
+    virtual CommErr transmit(uint8_t* msg, std::size_t size) = 0;
 
-  virtual CommErr receive(uint8_t* buff, std::size_t size) = 0;
+    virtual CommErr receive(uint8_t* buff, std::size_t size) = 0;
 
+  protected:
+    void* _handle;
 };
 
 
 class ICommFcty {
-public:
-  virtual ~ICommFcty() = default;
-  virtual IComm* produce() = 0;
+  public:
+    virtual ~ICommFcty()                 = default;
+    virtual IComm* produce()             = 0;
+    virtual IComm* produce(void *handle) = 0;
 };
 
 
@@ -85,3 +88,4 @@ public:
 /*-------- 5. factories ----------------------------------------------------------------------------------------------*/
 
 extern ICommFcty* p_cdc_fcty;
+extern ICommFcty* pCommOspiFcty;

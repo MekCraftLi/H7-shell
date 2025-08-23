@@ -30,8 +30,7 @@
 /* ------- include ---------------------------------------------------------------------------------------------------*/
 
 #include "app-intf.h"
-#include "cmsis_os.h"
-#include "cmsis_os2.h"
+
 #include "../Drivers/Communications/comm-intf.h"
 #include "../Drivers/Peripheral/GPIO/gpio-intf.hpp"
 #include "../../Middlewares/Third_Party/LetterShell/shell_cpp.h"
@@ -141,10 +140,10 @@ void ShellThread::run() {
       shellHandler(&_shell, rxBuffer[i]);
     }
   }
-
-  char statsBuf[512];
-  vTaskGetRunTimeStats(statsBuf);
-  logPrintln("%s\n===================================================\n", statsBuf);
+  //
+  // char statsBuf[512];
+  // vTaskGetRunTimeStats(statsBuf);
+  // logPrintln("%s\n===================================================\n", statsBuf);
 
 }
 

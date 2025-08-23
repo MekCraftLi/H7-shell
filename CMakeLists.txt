@@ -53,6 +53,15 @@ add_executable(${CMAKE_PROJECT_NAME}
         Middlewares/Third_Party/LetterShell/log/log.h
         Middlewares/Third_Party/LetterShell/log.c
         Applications/app-file.cpp
+        Middlewares/Third_Party/LetterShell/game.c
+        Middlewares/Third_Party/LetterShell/shell_cmd_group.c
+        Middlewares/Third_Party/LetterShell/shell_passthrough.c
+        Middlewares/Third_Party/LetterShell/shell_secure_user.c
+        Middlewares/Third_Party/LetterShell/2048.c
+        Middlewares/Third_Party/LetterShell/pushbox.c
+        Drivers/Communications/comm-ospi-impl.cpp
+        Drivers/Services/serv-time.cpp
+        Drivers/Services/serv-time.h
 )
 
 # Add STM32CubeMX generated sources

@@ -10,6 +10,8 @@
  */
 #include "shell_cmd_group.h"
 
+#include <stddef.h>
+
 extern int main_2048(int argc, char *argv[]);
 extern int main_pushbox(int argc, char* argv[]);
 

@@ -168,7 +168,7 @@ GpioErrCode pyro_gpio_reg_impl_t::set()
         return GpioErrCode::GPIO_ERR_NONE;
     }
 
-    static_cast<GPIO_TypeDef *>(_gpioRegAddr)->BSRR |= (pinRaw << 16);
+    static_cast<GPIO_TypeDef *>(_gpioRegAddr)->BSRR = (pinRaw << 16);
 
     return GpioErrCode::GPIO_SUCCESS;
 }

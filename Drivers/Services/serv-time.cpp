@@ -1,6 +1,6 @@
 /**
  *******************************************************************************
- * @file    comm_cdc_impl.cpp
+ * @file    serv-time.cpp
  * @brief   简要描述
  *******************************************************************************
  * @attention
@@ -14,41 +14,24 @@
  *
  *******************************************************************************
  * @author  MekLi
- * @date    2025/8/21
+ * @date    2025/8/23
  * @version 1.0
  *******************************************************************************
  */
 
 
-
-
 /* ------- define --------------------------------------------------------------------------------------------------*/
-
-
-
 
 
 /* ------- include ---------------------------------------------------------------------------------------------------*/
 
-#include "comm-intf.h"
-#include "usbd_cdc_if.h"
+#include "serv-time.h"
+#include "tim.h"
 
 
 
 /* ------- class prototypes-----------------------------------------------------------------------------------------*/
 
-class CommCdcImpl : public IComm {
-  CommErr transmit(uint8_t*, std::size_t) override;
-  CommErr receive(uint8_t*, std::size_t) override{ return CommErr::COMM_SUCCESS;}
-  CommErr configure() override{return CommErr::COMM_SUCCESS;}
-};
-
-class CommCdcFcty : public ICommFcty {
-  IComm* produce() override {
-    return new CommCdcImpl();
-  }
-  IComm* produce(void *handle) override {}
-};
 
 
 
@@ -60,15 +43,21 @@ class CommCdcFcty : public ICommFcty {
 
 /* ------- variables -------------------------------------------------------------------------------------------------*/
 
-CommCdcFcty cdc_fcty;
-ICommFcty* p_cdc_fcty = &cdc_fcty;
+TimeServ timeServ;
+
+uint32_t TimeServ::_timeUs = 0.0f;
 
 
 
 
 /* ------- function implement ----------------------------------------------------------------------------------------*/
 
-CommErr CommCdcImpl::transmit(uint8_t*msg, std::size_t size) {
- while ( CDC_Transmit_HS(msg, size) != USBD_OK);
-  return CommErr::COMM_SUCCESS;
+float TimeServ::getGlobalTimeUs() {
+
+    _timeUs = TIM2->CNT;
+    return static_cast<float>(_timeUs) / 1000;
 }
+
+
+
+

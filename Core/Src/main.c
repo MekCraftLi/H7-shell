@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "mdma.h"
 #include "octospi.h"
 #include "tim.h"
 #include "usb_device.h"
@@ -101,6 +102,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_MDMA_Init();
   MX_OCTOSPI1_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */

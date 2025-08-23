@@ -55,6 +55,8 @@ void DebugMon_Handler(void);
 void TIM1_UP_IRQHandler(void);
 void TIM2_IRQHandler(void);
 void OTG_HS_IRQHandler(void);
+void OCTOSPI1_IRQHandler(void);
+void MDMA_IRQHandler(void);
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */

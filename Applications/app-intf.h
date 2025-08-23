@@ -35,7 +35,8 @@
 #include "task.h"
 #include <cstdint>
 #include <string>
-
+#include "cmsis_os.h"
+#include "cmsis_os2.h"
 
 
 
@@ -109,6 +110,9 @@ class AppThreadBase : public IAppThread {
     uint16_t _stackSize;
     UBaseType_t _priority;
     TaskHandle_t _handle;
+    float _cpuUsage;
+    float _stackUsage;
+    float _timeUsage;
 
     // 静态任务入口，用于FreeRTOS
     [[noreturn]] static void taskEntry(void* pvParameters) {
@@ -130,7 +134,7 @@ class AppThreadBase : public IAppThread {
 /* ------- variables -------------------------------------------------------------------------------------------------*/
 
 extern AppThreadBase* _p_shell_thread;
-
+extern AppThreadBase* pFileThread;
 
 
 
