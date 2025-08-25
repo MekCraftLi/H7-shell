@@ -30,17 +30,19 @@
 
 /* ------- include ---------------------------------------------------------------------------------------------------*/
 
+#include "../../Drivers/Devices/w25qxx.h"
 #include "../../Drivers/Peripheral/GPIO/gpio-intf.hpp"
 #include "../../Drivers/Services/serv-time.h"
-#include "../Drivers/Communications/comm-intf.h"
 #include "app-intf.h"
 #include "octospi.h"
+#include "semphr.h"
 
 /* ------- class prototypes-----------------------------------------------------------------------------------------*/
 
 class FileThread : public AppThreadBase {
+
   public:
-    FileThread() : AppThreadBase("File", 512, 4) {}
+    FileThread() : AppThreadBase("File", 512, 4), _flash(&hospi1) {}
 
     void init() override;
 
@@ -49,9 +51,14 @@ class FileThread : public AppThreadBase {
     void putQueue();
 
   private:
-    IComm* _comm;
-    IGpio* _gpio;
-    osMessageQueueId_t rxQueue;
+    W25Qxx _flash;
+    xQueueHandle _sAssignQ;
+    xSemaphoreHandle _waitForReceiveLock;
+    xSemaphoreHandle _waitForTransmitLock;
+    friend void HAL_OSPI_RxCpltCallback(OSPI_HandleTypeDef*);
+    friend void HAL_OSPI_CmdCpltCallback(OSPI_HandleTypeDef*);
+    friend void HAL_OSPI_TxCpltCallback(OSPI_HandleTypeDef*);
+    friend void waitForRxCplt();
 };
 
 
@@ -67,6 +74,8 @@ class FileThread : public AppThreadBase {
 
 FileThread fileThread;
 AppThreadBase* pFileThread = &fileThread;
+uint8_t txBuff[256];
+uint8_t rxBuff[256];
 
 
 
@@ -74,20 +83,120 @@ AppThreadBase* pFileThread = &fileThread;
 /* ------- function implement ----------------------------------------------------------------------------------------*/
 
 void FileThread::init() {
-    _comm = pCommOspiFcty->produce(&hospi1);
-    auto r =
-        p_gpio_lib_fcty->produce(GpioPortEnum::GPIO_PORT_B, GpioPinEnum::GPIO_PIN_10_, GpioModeEnum::GPIO_MODE_AF_PP_);
 
-    _gpio = std::get<IGpio*>(r);
+    for (uint16_t i = 0; i < sizeof(txBuff); i++) {
+        txBuff[i] = (i * 3 + 7) ^ 6;
+    }
+
+    _waitForReceiveLock  = xSemaphoreCreateBinary();
+    _waitForTransmitLock = xSemaphoreCreateBinary();
+    configASSERT(_waitForReceiveLock);
+    configASSERT(_waitForTransmitLock);
+    //
+    // _flash.enquireJedecIdAsync();
+    //
+    // if (xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY) == pdTRUE) {
+    //     const auto r = fileThread._flash.asyncRxCallback();
+    //     (void)r;
+    // }
+    //
+    // _flash.enquireDeviceIdAsync();
+    //
+    // if (xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY) == pdTRUE) {
+    //     const auto r = fileThread._flash.asyncRxCallback();
+    //     (void)r;
+    // }
+    //
+    // _flash.enquireUniqueIdAsync();
+    //
+    // if (xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY) == pdTRUE) {
+    //     const auto r = fileThread._flash.asyncRxCallback();
+    //     (void)r;
+    // }
+    //
+    // _flash.enquireStatusRegisterAsync(W25QxxRegisterEnum::STATUS_REGISTER_1);
+    //
+    // if (xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY) == pdTRUE) {
+    //     const auto r = fileThread._flash.asyncRxCallback();
+    //     (void)r;
+    // }
+    //
+    // _flash.enquireStatusRegisterAsync(W25QxxRegisterEnum::STATUS_REGISTER_1);
+    //
+    //
+    // if (xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY) == pdTRUE) {
+    //     const auto r = fileThread._flash.asyncRxCallback();
+    //     (void)r;
+    // }
+    //
+    // _flash.enquireStatusRegisterAsync(W25QxxRegisterEnum::STATUS_REGISTER_2);
+    //
+    // if (xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY) == pdTRUE) {
+    //     const auto r = fileThread._flash.asyncRxCallback();
+    //     (void)r;
+    // }
+    //
+    // _flash.writeEnable();
+    //
+    // if (xSemaphoreTake(_waitForTransmitLock, portMAX_DELAY) == pdTRUE) {
+    //     _flash.pageProgram(0x00, txBuff, 256);
+    // }
+    //
+    // if (xSemaphoreTake(_waitForTransmitLock, portMAX_DELAY) == pdTRUE) {
+    //     _flash.enquireStatusRegisterAsync(W25QxxRegisterEnum::STATUS_REGISTER_1);
+    // }
+    //
+    // if (xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY) == pdTRUE) {
+    //     _flash.asyncRxCallback();
+    // }
+    //
+    // while (_flash.getBusyBit()) {
+    //     _flash.enquireStatusRegisterAsync(W25QxxRegisterEnum::STATUS_REGISTER_1);
+    //     if (xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY) == pdTRUE) {
+    //         _flash.asyncRxCallback();
+    //     }
+    //
+    //     osDelay(100);
+    // }
+
+    vTaskDelay(2);
+    _flash.fastReadData(0xF0, rxBuff, 32);
 
 
-    uint8_t buf[] = {0xA8, 0x66, 0xC8};
-
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_RESET);
-    _comm->transmit(buf, 3);
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_SET);
 }
 
-void FileThread::run() { float time = timeServ.getGlobalTimeUs(); }
+void FileThread::run() {
+    float time = timeServ.getGlobalTimeUs();
+    (void)time;
+}
 
-void FileThread::putQueue() {}
+
+
+void HAL_OSPI_RxCpltCallback(OSPI_HandleTypeDef* hospi) {
+
+    if (hospi == &hospi1) {
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xSemaphoreGiveFromISR(fileThread._waitForReceiveLock, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}
+
+void HAL_OSPI_CmdCpltCallback(OSPI_HandleTypeDef* hospi) {
+
+    if (hospi == &hospi1) {
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xSemaphoreGiveFromISR(fileThread._waitForTransmitLock, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}
+
+void HAL_OSPI_TxCpltCallback(OSPI_HandleTypeDef* hospi) {
+
+    if (hospi == &hospi1) {
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xSemaphoreGiveFromISR(fileThread._waitForTransmitLock, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}
+
+void waitForRxCplt() { xSemaphoreTake(fileThread._waitForReceiveLock, portMAX_DELAY); }

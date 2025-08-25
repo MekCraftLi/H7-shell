@@ -1,6 +1,6 @@
 /**
  *******************************************************************************
- * @file    comm-intf.h
+ * @file    comm-ospi.h
  * @brief   简要描述
  *******************************************************************************
  * @attention
@@ -13,13 +13,11 @@
  * none
  *
  *******************************************************************************
- * @author  MekLi🐂
- * @date    2025/8/21
+ * @author  MekLi
+ * @date    2025/8/24
  * @version 1.0
  *******************************************************************************
  */
-
-
 
 
 /* Define to prevent recursive inclusion -----------------------------------------------------------------------------*/
@@ -28,26 +26,22 @@
 
 
 
-
 /*-------- 1. includes and imports -----------------------------------------------------------------------------------*/
 
-#include <cstdint>
-#include <string>
+#include "comm-intf.h"
+
 
 
 
 
 /*-------- 2. enum ---------------------------------------------------------------------------------------------------*/
 
-/**
- * @brief Error Code of communicate interface.
- */
-enum class CommErr {
-    COMM_ERR_NONE,
-    COMM_ERR_TIMEOUT,
-    COMM_ERR_BUSY,
-    COMM_ERR_INVALID,
-    COMM_SUCCESS,
+enum class OspiLineNum {
+    NONE,
+    ONE_LINE,
+    TWO_LINES,
+    FOUR_LINES,
+    EIGHT_LINES,
 };
 
 
@@ -55,36 +49,18 @@ enum class CommErr {
 
 /*-------- 3. interface ---------------------------------------------------------------------------------------------*/
 
-class IComm {
-  public:
-    virtual ~IComm()                                         = default;
-
-    virtual CommErr configure()                              = 0;
-
-    virtual CommErr transmit(uint8_t* msg, std::size_t size) = 0;
-
-    virtual CommErr receive(uint8_t* buff, std::size_t size) = 0;
-
-  protected:
-    void* _handle;
+class CommOspi {
+public:
+    explicit CommOspi(void* handle){_handle = handle;};
+    CommErr transmit (uint8_t *data, uint16_t len, OspiLineNum line) const;
+private:
+    void* _handle{};
 };
 
-
-class ICommFcty {
-  public:
-    virtual ~ICommFcty()                 = default;
-    virtual IComm* produce()             = 0;
-    virtual IComm* produce(void *handle) = 0;
-};
 
 
 
 /*-------- 4. decorator ----------------------------------------------------------------------------------------------*/
 
 
-
-
-
 /*-------- 5. factories ----------------------------------------------------------------------------------------------*/
-
-extern ICommFcty* p_cdc_fcty;

@@ -43,9 +43,9 @@ int g_boards[7][8] = {
     boards[7][8] = {};
 
 //记录小老鼠在移动中的位置
-int row = 0;
-int col = 0;
-int cnt = 0; //箱子个数，用来判断游戏是否结束。
+static int row = 0;
+static int col = 0;
+static int cnt = 0; //箱子个数，用来判断游戏是否结束。
 
 //初始化地图
 void pushbox_init()

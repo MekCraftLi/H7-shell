@@ -30,31 +30,14 @@
 
 /* ------- include ---------------------------------------------------------------------------------------------------*/
 
-#include "comm-intf.h"
-#include "octospi.h"
+#include "comm-ospi.h"
+#include "stm32h7xx_hal.h"
 #include "stm32h7xx_hal_ospi.h"
 
 
 
 
 /* ------- class prototypes-----------------------------------------------------------------------------------------*/
-
-class CommOspiImpl : public IComm {
-  public:
-    CommOspiImpl(OSPI_HandleTypeDef* hospi) { _handle = hospi; }
-    CommErr transmit(uint8_t*, std::size_t) override;
-    CommErr receive(uint8_t*, std::size_t) override { return CommErr::COMM_SUCCESS; }
-    CommErr configure() override { return CommErr::COMM_SUCCESS; }
-};
-
-class CommOspiFcty final : public ICommFcty {
-    IComm* produce() override {};
-    IComm* produce(void* handle) override { return new CommOspiImpl(static_cast<OSPI_HandleTypeDef*>(handle)); }
-};
-
-CommOspiFcty commOspiFcty;
-ICommFcty* pCommOspiFcty = &commOspiFcty;
-
 
 
 
@@ -72,7 +55,7 @@ ICommFcty* pCommOspiFcty = &commOspiFcty;
 
 /* ------- function implement ----------------------------------------------------------------------------------------*/
 
-CommErr CommOspiImpl::transmit(uint8_t* data, std::size_t len) {
+CommErr CommOspi::transmit(uint8_t *data, uint16_t len, OspiLineNum line) const {
 
     auto* hospi = static_cast<OSPI_HandleTypeDef*>(_handle);
 
@@ -83,12 +66,12 @@ CommErr CommOspiImpl::transmit(uint8_t* data, std::size_t len) {
     sCommand.FlashId               = HAL_OSPI_FLASH_ID_1;
 
     sCommand.Instruction           = 0x9F;
-    sCommand.InstructionMode       = HAL_OSPI_INSTRUCTION_1_LINE;
+    sCommand.InstructionMode       = HAL_OSPI_INSTRUCTION_NONE;
     sCommand.InstructionSize       = HAL_OSPI_INSTRUCTION_8_BITS;
     sCommand.InstructionDtrMode    = HAL_OSPI_INSTRUCTION_DTR_DISABLE;
 
     sCommand.Address               = 0x0000;
-    sCommand.AddressMode           = HAL_OSPI_ADDRESS_1_LINE;
+    sCommand.AddressMode           = HAL_OSPI_ADDRESS_NONE;
     sCommand.AddressSize           = HAL_OSPI_ADDRESS_16_BITS;
     sCommand.AddressDtrMode        = HAL_OSPI_ADDRESS_DTR_DISABLE;
 
@@ -97,11 +80,12 @@ CommErr CommOspiImpl::transmit(uint8_t* data, std::size_t len) {
     sCommand.AlternateBytesSize    = HAL_OSPI_ALTERNATE_BYTES_16_BITS;
     sCommand.AlternateBytesDtrMode = HAL_OSPI_ALTERNATE_BYTES_DTR_DISABLE;
 
-    sCommand.DataMode              = HAL_OSPI_DATA_NONE;
+    //sCommand.DataMode              = static_cast<uint32_t>(line) << 24;
+    sCommand.DataMode              = HAL_OSPI_DATA_1_LINE;
     sCommand.NbData                = len;
     sCommand.DataDtrMode           = HAL_OSPI_DATA_DTR_DISABLE;
 
-    sCommand.DummyCycles           = 0x0F;
+    sCommand.DummyCycles           = 0x0;
     sCommand.DQSMode               = HAL_OSPI_DQS_DISABLE;
     sCommand.SIOOMode              = HAL_OSPI_SIOO_INST_EVERY_CMD;
 
@@ -114,3 +98,4 @@ CommErr CommOspiImpl::transmit(uint8_t* data, std::size_t len) {
 
     return CommErr::COMM_SUCCESS;
 }
+

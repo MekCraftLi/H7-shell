@@ -76,14 +76,14 @@ class IAppThread {
 class AppThreadBase : public IAppThread {
   public:
     AppThreadBase(const char* name, uint16_t stackSize, UBaseType_t priority)
-        : _name(name), _stackSize(stackSize), _priority(priority), _handle(nullptr) {}
+        : _name(name), _stackSize(stackSize), _priority(priority), _taskHanle(nullptr) {}
 
     // 统一启动线程
     bool start() override {
         BaseType_t result = xTaskCreate(taskEntry, // 静态入口函数
                                         _name, _stackSize,
                                         this, // 将对象指针传给任务
-                                        _priority, &_handle);
+                                        _priority, &_taskHanle);
         return result == pdPASS;
     }
 
@@ -91,13 +91,13 @@ class AppThreadBase : public IAppThread {
 
 
     [[nodiscard]] uint32_t getStackHighWaterMark() const override {
-        if (_handle)
-            return uxTaskGetStackHighWaterMark(_handle);
+        if (_taskHanle)
+            return uxTaskGetStackHighWaterMark(_taskHanle);
         return 0;
     }
 
 
-    [[nodiscard]] TaskHandle_t getTaskHandle() const override { return _handle; }
+    [[nodiscard]] TaskHandle_t getTaskHandle() const override { return _taskHanle; }
 
     // 可选实现：CPU占用率和运行时间
     [[nodiscard]] uint32_t getRunTime() const override { return 0; }
@@ -109,7 +109,7 @@ class AppThreadBase : public IAppThread {
     const char* _name;
     uint16_t _stackSize;
     UBaseType_t _priority;
-    TaskHandle_t _handle;
+    TaskHandle_t _taskHanle;
     float _cpuUsage;
     float _stackUsage;
     float _timeUsage;

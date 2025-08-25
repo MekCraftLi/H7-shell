@@ -59,9 +59,15 @@ add_executable(${CMAKE_PROJECT_NAME}
         Middlewares/Third_Party/LetterShell/shell_secure_user.c
         Middlewares/Third_Party/LetterShell/2048.c
         Middlewares/Third_Party/LetterShell/pushbox.c
-        Drivers/Communications/comm-ospi-impl.cpp
+        Drivers/Communications/comm-ospi.cpp
         Drivers/Services/serv-time.cpp
         Drivers/Services/serv-time.h
+        Drivers/Devices/w25qxx.cpp
+        Drivers/Devices/w25qxx.h
+        Drivers/Devices/w25qxx-comm-adpter.cpp
+        Drivers/Communications/comm-ospi.h
+        Applications/app-stackOverFlow.cpp
+        Drivers/Devices/w25qxx-inst.h
 )
 
 # Add STM32CubeMX generated sources
