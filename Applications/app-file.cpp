@@ -31,8 +31,10 @@
 /* ------- include ---------------------------------------------------------------------------------------------------*/
 
 #include "../../Drivers/Devices/w25qxx.h"
-#include "../../Drivers/Peripheral/GPIO/gpio-intf.hpp"
 #include "../../Drivers/Services/serv-time.h"
+#include "../Adapters/adapter-lfs.h"
+#include "../Middlewares/Third_Party/LittleFs/lfs.h"
+#include "FreeRTOS.h"
 #include "app-intf.h"
 #include "octospi.h"
 #include "semphr.h"
@@ -42,7 +44,7 @@
 class FileThread : public AppThreadBase {
 
   public:
-    FileThread() : AppThreadBase("File", 512, 4), _flash(&hospi1) {}
+    FileThread() : AppThreadBase("File", 1024, 4), _flash(&hospi1) {}
 
     void init() override;
 
@@ -55,9 +57,14 @@ class FileThread : public AppThreadBase {
     xQueueHandle _sAssignQ;
     xSemaphoreHandle _waitForReceiveLock;
     xSemaphoreHandle _waitForTransmitLock;
+    xSemaphoreHandle _waitForCmd;
+    xSemaphoreHandle _waitForFlag;
+    LfsAdapter _lfsAdapter;
+    float _runTime;
     friend void HAL_OSPI_RxCpltCallback(OSPI_HandleTypeDef*);
     friend void HAL_OSPI_CmdCpltCallback(OSPI_HandleTypeDef*);
     friend void HAL_OSPI_TxCpltCallback(OSPI_HandleTypeDef*);
+    friend void HAL_OSPI_StatusMatchCallback(OSPI_HandleTypeDef* hospi);
     friend void waitForRxCplt();
 };
 
@@ -74,100 +81,60 @@ class FileThread : public AppThreadBase {
 
 FileThread fileThread;
 AppThreadBase* pFileThread = &fileThread;
-uint8_t txBuff[256];
-uint8_t rxBuff[256];
+static uint8_t lfs_read_buf[LFS_CACHE_SIZE];
+static uint8_t lfs_prog_buf[LFS_CACHE_SIZE];
+static uint8_t lfs_lookahead_buf[LFS_LOOKAHEAD_SIZE];
+
+uint32_t debugFlag = 0;
+uint32_t debugCnt  = 0;
+
+static lfs_t lfs;
+static lfs_file_t file;
+
+struct lfs_config fcfg{
+    .read             = LfsAdapter::read,
+    .prog             = LfsAdapter::program,
+    .erase            = LfsAdapter::erase,
+    .sync             = LfsAdapter::sync,
 
 
+    .read_size        = LFS_READ_SIZE,
+    .prog_size        = LFS_PROG_SIZE,
+    .block_size       = LFS_BLOCK_SIZE,
+    .block_count      = LFS_BLOCK_COUNT,
+    .block_cycles     = LFS_BLOCK_CYCLES,
+    .cache_size       = LFS_CACHE_SIZE,
+    .lookahead_size   = LFS_LOOKAHEAD_SIZE,
 
+
+    .read_buffer      = lfs_read_buf,
+    .prog_buffer      = lfs_prog_buf,
+    .lookahead_buffer = lfs_lookahead_buf,
+};
 
 /* ------- function implement ----------------------------------------------------------------------------------------*/
 
 void FileThread::init() {
 
-    for (uint16_t i = 0; i < sizeof(txBuff); i++) {
-        txBuff[i] = (i * 3 + 7) ^ 6;
-    }
 
     _waitForReceiveLock  = xSemaphoreCreateBinary();
     _waitForTransmitLock = xSemaphoreCreateBinary();
+    _waitForFlag         = xSemaphoreCreateBinary();
+    _waitForCmd          = xSemaphoreCreateBinary();
     configASSERT(_waitForReceiveLock);
     configASSERT(_waitForTransmitLock);
-    //
-    // _flash.enquireJedecIdAsync();
-    //
-    // if (xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY) == pdTRUE) {
-    //     const auto r = fileThread._flash.asyncRxCallback();
-    //     (void)r;
-    // }
-    //
-    // _flash.enquireDeviceIdAsync();
-    //
-    // if (xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY) == pdTRUE) {
-    //     const auto r = fileThread._flash.asyncRxCallback();
-    //     (void)r;
-    // }
-    //
-    // _flash.enquireUniqueIdAsync();
-    //
-    // if (xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY) == pdTRUE) {
-    //     const auto r = fileThread._flash.asyncRxCallback();
-    //     (void)r;
-    // }
-    //
-    // _flash.enquireStatusRegisterAsync(W25QxxRegisterEnum::STATUS_REGISTER_1);
-    //
-    // if (xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY) == pdTRUE) {
-    //     const auto r = fileThread._flash.asyncRxCallback();
-    //     (void)r;
-    // }
-    //
-    // _flash.enquireStatusRegisterAsync(W25QxxRegisterEnum::STATUS_REGISTER_1);
-    //
-    //
-    // if (xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY) == pdTRUE) {
-    //     const auto r = fileThread._flash.asyncRxCallback();
-    //     (void)r;
-    // }
-    //
-    // _flash.enquireStatusRegisterAsync(W25QxxRegisterEnum::STATUS_REGISTER_2);
-    //
-    // if (xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY) == pdTRUE) {
-    //     const auto r = fileThread._flash.asyncRxCallback();
-    //     (void)r;
-    // }
-    //
-    // _flash.writeEnable();
-    //
-    // if (xSemaphoreTake(_waitForTransmitLock, portMAX_DELAY) == pdTRUE) {
-    //     _flash.pageProgram(0x00, txBuff, 256);
-    // }
-    //
-    // if (xSemaphoreTake(_waitForTransmitLock, portMAX_DELAY) == pdTRUE) {
-    //     _flash.enquireStatusRegisterAsync(W25QxxRegisterEnum::STATUS_REGISTER_1);
-    // }
-    //
-    // if (xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY) == pdTRUE) {
-    //     _flash.asyncRxCallback();
-    // }
-    //
-    // while (_flash.getBusyBit()) {
-    //     _flash.enquireStatusRegisterAsync(W25QxxRegisterEnum::STATUS_REGISTER_1);
-    //     if (xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY) == pdTRUE) {
-    //         _flash.asyncRxCallback();
-    //     }
-    //
-    //     osDelay(100);
-    // }
+    configASSERT(_waitForFlag);
 
-    vTaskDelay(2);
-    _flash.fastReadData(0xF0, rxBuff, 32);
+    _lfsAdapter.config(&_flash, _waitForFlag, _waitForTransmitLock, _waitForCmd, _waitForReceiveLock);
+
+
 
 
 }
 
 void FileThread::run() {
-    float time = timeServ.getGlobalTimeUs();
-    (void)time;
+    vTaskDelay(1000);
+
 }
 
 
@@ -185,7 +152,7 @@ void HAL_OSPI_CmdCpltCallback(OSPI_HandleTypeDef* hospi) {
 
     if (hospi == &hospi1) {
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        xSemaphoreGiveFromISR(fileThread._waitForTransmitLock, &xHigherPriorityTaskWoken);
+        xSemaphoreGiveFromISR(fileThread._waitForCmd, &xHigherPriorityTaskWoken);
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }
 }
@@ -199,4 +166,10 @@ void HAL_OSPI_TxCpltCallback(OSPI_HandleTypeDef* hospi) {
     }
 }
 
-void waitForRxCplt() { xSemaphoreTake(fileThread._waitForReceiveLock, portMAX_DELAY); }
+void HAL_OSPI_StatusMatchCallback(OSPI_HandleTypeDef* hospi) {
+    if (hospi == &hospi1) {
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xSemaphoreGiveFromISR(fileThread._waitForFlag, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}

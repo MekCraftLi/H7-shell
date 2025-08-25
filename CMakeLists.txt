@@ -68,6 +68,10 @@ add_executable(${CMAKE_PROJECT_NAME}
         Drivers/Communications/comm-ospi.h
         Applications/app-stackOverFlow.cpp
         Drivers/Devices/w25qxx-inst.h
+        Middlewares/Third_Party/LittleFs/lfs.c
+        Middlewares/Third_Party/LittleFs/lfs_util.c
+        Adapters/adapter-lfs.cpp
+        Adapters/adapter-lfs.h
 )
 
 # Add STM32CubeMX generated sources

@@ -140,10 +140,10 @@ void ShellThread::run() {
       shellHandler(&_shell, rxBuffer[i]);
     }
   }
-  //
-  // char statsBuf[512];
-  // vTaskGetRunTimeStats(statsBuf);
-  // logPrintln("%s\n===================================================\n", statsBuf);
+
+  char statsBuf[512];
+  vTaskGetRunTimeStats(statsBuf);
+  logPrintln("%s\n===================================================\n", statsBuf);
 
 }
 

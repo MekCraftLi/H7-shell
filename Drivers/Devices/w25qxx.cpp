@@ -477,7 +477,7 @@ W25QxxErr W25Qxx::pageProgram(const uint32_t address, void* pData, const uint16_
     return ret;
 }
 
-W25QxxErr W25Qxx::quadInputPageProgram(const uint32_t address, void* pData, const uint16_t len) const {
+W25QxxErr W25Qxx::quadInputPageProgram(const uint32_t address, const void* pData, const uint16_t len) const {
 
     if (pData == nullptr) {
         return W25QxxErr::INVALID;
@@ -491,7 +491,7 @@ W25QxxErr W25Qxx::quadInputPageProgram(const uint32_t address, void* pData, cons
 
     const W25QxxMsgElement inst(MsgTypeEnum::INSTRUCTION, W25QxxInst::QUAD_INPUT_PAGE_PROGRAM);
     const W25QxxMsgElement addr(MsgTypeEnum::ADDRESS, address, 3, W25QxxCommModeEnum::STANDARD_SPI);
-    const W25QxxMsgElement data(MsgTypeEnum::DATA, static_cast<uint8_t*>(pData), len, W25QxxCommModeEnum::QSPI);
+    const W25QxxMsgElement data(MsgTypeEnum::DATA, (uint8_t*)(pData), len, W25QxxCommModeEnum::QSPI);
 
     const std::vector msgs = {inst, addr, data};
 
@@ -502,7 +502,7 @@ W25QxxErr W25Qxx::quadInputPageProgram(const uint32_t address, void* pData, cons
     return ret;
 }
 
-W25QxxErr W25Qxx::sectorErase(uint32_t address) const {
+W25QxxErr W25Qxx::sectorErase(const uint32_t address) const {
 
     /* 1. collect messages */
 
@@ -938,6 +938,34 @@ W25QxxErr W25Qxx::asyncRxCallback() {
     _rxOpts.clear();
 
     return W25QxxErr::SUCCESS;
+}
+
+W25QxxErr W25Qxx::asyncWaitForFlag(const W25QxxStateEnum s) {
+    uint8_t target;
+    uint8_t mask;
+    uint8_t interval = 2;
+    W25QxxInst inst;
+
+    switch (s) {
+        case W25QxxStateEnum::FREE:
+            target = 0x00;
+            mask   = 0x01;
+            inst   = W25QxxInst::READ_SR1;
+            break;
+        default:
+            return W25QxxErr::INVALID;
+    }
+
+    const W25QxxMsgElement readSrInst(MsgTypeEnum::INSTRUCTION, inst);
+    const W25QxxMsgElement writeSr(MsgTypeEnum::DATA, _pRxBuff, 1, W25QxxCommModeEnum::STANDARD_SPI);
+
+    std::vector<W25QxxMsgElement> msgs = {readSrInst, writeSr};
+
+
+
+    auto ret                           = _spiComm.autoPolling(msgs, target, mask, interval);
+
+    return ret;
 }
 
 static void memcpy_reverse_order(void* dest, const void* src, size_t len) {

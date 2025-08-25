@@ -80,6 +80,13 @@ enum class W25QxxWrapLenEnum {
     WRAP_64_BYTE,
 };
 
+enum class W25QxxStateEnum {
+    NONE,
+    FREE,
+    BUSY,
+    SUSPEND,
+};
+
 
 
 class W25QxxMsgElement {
@@ -174,7 +181,9 @@ class W25QxxSpiComm {
     [[nodiscard]] W25QxxErr transmit(const std::vector<W25QxxMsgElement>&) const;
     [[nodiscard]] W25QxxErr receive(const std::vector<W25QxxMsgElement>& msg) const;
 
-  private:
+    [[nodiscard]] W25QxxErr autoPolling(std::vector<W25QxxMsgElement>& msgs , uint32_t target, uint32_t mask, uint8_t interval);
+
+private:
     void* _commHandle = nullptr;
 };
 
@@ -276,7 +285,7 @@ public:
 
     W25QxxErr pageProgram(uint32_t address, void* pData, uint16_t len) const;
 
-    W25QxxErr quadInputPageProgram(uint32_t address, void* pData, uint16_t len) const;
+    W25QxxErr quadInputPageProgram(uint32_t address, const void* pData, uint16_t len) const;
 
 
 
@@ -337,6 +346,8 @@ public:
 
 
     W25QxxErr asyncRxCallback();
+
+    W25QxxErr asyncWaitForFlag(W25QxxStateEnum s);
 
 
     /************* setter & getter *************/
