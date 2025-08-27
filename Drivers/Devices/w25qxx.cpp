@@ -452,7 +452,7 @@ W25QxxErr W25Qxx::setBurstWithWrap(const W25QxxWrapLenEnum len) const {
     return ret;
 }
 
-W25QxxErr W25Qxx::pageProgram(const uint32_t address, void* pData, const uint16_t len) const {
+W25QxxErr W25Qxx::pageProgram(const uint32_t address, const void* pData, const uint16_t len) const {
 
     if (pData == nullptr) {
         return W25QxxErr::INVALID;
@@ -466,7 +466,7 @@ W25QxxErr W25Qxx::pageProgram(const uint32_t address, void* pData, const uint16_
 
     const W25QxxMsgElement inst(MsgTypeEnum::INSTRUCTION, W25QxxInst::PAGE_PROGRAM);
     const W25QxxMsgElement addr(MsgTypeEnum::ADDRESS, address, 3, W25QxxCommModeEnum::STANDARD_SPI);
-    const W25QxxMsgElement data(MsgTypeEnum::DATA, static_cast<uint8_t*>(pData), len, W25QxxCommModeEnum::STANDARD_SPI);
+    const W25QxxMsgElement data(MsgTypeEnum::DATA, (uint8_t*)(pData), len, W25QxxCommModeEnum::STANDARD_SPI);
 
     const std::vector msgs = {inst, addr, data};
 
@@ -700,7 +700,7 @@ W25QxxErr W25Qxx::enquireSfdpRegisterAsync() {
     const W25QxxMsgElement inst(MsgTypeEnum::INSTRUCTION, W25QxxInst::READ_SFDP_REGISTER);
     const W25QxxMsgElement addr(MsgTypeEnum::ADDRESS, static_cast<uint32_t>(0x00), 3, W25QxxCommModeEnum::STANDARD_SPI);
     const W25QxxMsgElement dummy(MsgTypeEnum::DUMMY_CYCLE, 8);
-    const W25QxxMsgElement data(MsgTypeEnum::DATA, _pRxBuff, 2, W25QxxCommModeEnum::STANDARD_SPI);
+    const W25QxxMsgElement data(MsgTypeEnum::DATA, _pRxBuff, 8, W25QxxCommModeEnum::STANDARD_SPI);
 
     const std::vector msgs = {inst, data, addr, dummy};
 
@@ -710,7 +710,7 @@ W25QxxErr W25Qxx::enquireSfdpRegisterAsync() {
 
     /* 3. submit the assignment request */
 
-    const W25QxxRxOpt sfdp(&_sfdpRegister, 2);
+    const W25QxxRxOpt sfdp(&_sfdpRegister, 8);
 
     _rxOpts.push_back(sfdp);
 

@@ -98,11 +98,18 @@ W25QxxErr W25QxxSpiComm::autoPolling(std::vector<W25QxxMsgElement> &msgs, uint32
     }
 
     uint32_t state = HAL_OSPI_GetState(static_cast<OSPI_HandleTypeDef*>(_commHandle));
-    if (state == HAL_OSPI_STATE_BUSY_TX) {
-        while (true);
+    if (state == HAL_OSPI_STATE_BUSY_TX || state == HAL_OSPI_STATE_BUSY_CMD) {
+        ret = W25QxxErr::BUSY;
+        return ret;
+    } else if (state != HAL_OSPI_STATE_READY) {
+        ret = W25QxxErr::INVALID;
+        return ret;
     }
 
-    HAL_OSPI_Command(static_cast<OSPI_HandleTypeDef*>(_commHandle), &sCommand, HAL_OSPI_TIMEOUT_DEFAULT_VALUE);
+    if (HAL_OSPI_Command(static_cast<OSPI_HandleTypeDef*>(_commHandle), &sCommand, HAL_OSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK) {
+        ret = W25QxxErr::INVALID;
+        return ret;
+    }
 
     OSPI_AutoPollingTypeDef aConfig = {};
     aConfig.Match = target;
@@ -111,7 +118,10 @@ W25QxxErr W25QxxSpiComm::autoPolling(std::vector<W25QxxMsgElement> &msgs, uint32
     aConfig.AutomaticStop = HAL_OSPI_AUTOMATIC_STOP_ENABLE;
     aConfig.MatchMode = HAL_OSPI_MATCH_MODE_AND;
 
-    HAL_OSPI_AutoPolling_IT(static_cast<OSPI_HandleTypeDef*>(_commHandle), &aConfig);
+    if (HAL_OSPI_AutoPolling_IT(static_cast<OSPI_HandleTypeDef*>(_commHandle), &aConfig) != HAL_OK) {
+        ret = W25QxxErr::INVALID;
+        return ret;
+    }
 
 
     return ret;

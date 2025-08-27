@@ -1,33 +1,33 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * File Name          : freertos.c
-  * Description        : Code for freertos applications
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2025 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * File Name          : freertos.c
+ * Description        : Code for freertos applications
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2025 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
 #include "freertos.h"
-#include "task.h"
-#include "main.h"
 #include "cmsis_os.h"
+#include "main.h"
+#include "task.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "usb_device.h"
-#include "../../Drivers/Peripheral/GPIO/gpio-intf.hpp"
 #include "../../Applications/app-intf.h"
+#include "../../Drivers/Peripheral/GPIO/gpio-intf.hpp"
+#include "usb_device.h"
 
 /* USER CODE END Includes */
 
@@ -53,91 +53,93 @@
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
-  .stack_size = 1024,
-  .priority = (osPriority_t) osPriorityNormal,
+    .name       = "defaultTask",
+    .stack_size = 1024,
+    .priority   = (osPriority_t)osPriorityNormal,
 };
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 extern "C" {
-  void MX_FREERTOS_Init(void);
+void MX_FREERTOS_Init(void);
 }
 /* USER CODE END FunctionPrototypes */
 
-void StartDefaultTask(void *argument);
+void StartDefaultTask(void* argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /**
-  * @brief  FreeRTOS initialization
-  * @param  None
-  * @retval None
-  */
+ * @brief  FreeRTOS initialization
+ * @param  None
+ * @retval None
+ */
 void MX_FREERTOS_Init(void) {
-  /* USER CODE BEGIN Init */
+    /* USER CODE BEGIN Init */
 
-  /* USER CODE END Init */
+    /* USER CODE END Init */
 
-  /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
-  /* USER CODE END RTOS_MUTEX */
+    /* USER CODE BEGIN RTOS_MUTEX */
+    /* add mutexes, ... */
+    /* USER CODE END RTOS_MUTEX */
 
-  /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
-  /* USER CODE END RTOS_SEMAPHORES */
+    /* USER CODE BEGIN RTOS_SEMAPHORES */
+    /* add semaphores, ... */
+    /* USER CODE END RTOS_SEMAPHORES */
 
-  /* USER CODE BEGIN RTOS_TIMERS */
-  /* start timers, add new ones, ... */
-  /* USER CODE END RTOS_TIMERS */
+    /* USER CODE BEGIN RTOS_TIMERS */
+    /* start timers, add new ones, ... */
+    /* USER CODE END RTOS_TIMERS */
 
-  /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
-  /* USER CODE END RTOS_QUEUES */
+    /* USER CODE BEGIN RTOS_QUEUES */
+    /* add queues, ... */
+    /* USER CODE END RTOS_QUEUES */
 
-  /* Create the thread(s) */
-  /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
-  _p_shell_thread->start();
-  pFileThread->start();
-  /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
-  /* USER CODE END RTOS_THREADS */
+    /* Create the thread(s) */
+    /* creation of defaultTask */
+    defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+    _p_shell_thread->start();
+    pFileThread->start();
+    /* USER CODE BEGIN RTOS_THREADS */
+    /* add threads, ... */
+    /* USER CODE END RTOS_THREADS */
 
-  /* USER CODE BEGIN RTOS_EVENTS */
-  /* add events, ... */
-  /* USER CODE END RTOS_EVENTS */
-
+    /* USER CODE BEGIN RTOS_EVENTS */
+    /* add events, ... */
+    /* USER CODE END RTOS_EVENTS */
 }
 
 /* USER CODE BEGIN Header_StartDefaultTask */
 /**
-  * @brief  Function implementing the defaultTask thread.
-  * @param  argument: Not used
-  * @retval None
-  */
+ * @brief  Function implementing the defaultTask thread.
+ * @param  argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void *argument)
-{
-  /* USER CODE BEGIN StartDefaultTask */
-  MX_USB_DEVICE_Init();
-  IGpio *g;
-  auto r = p_gpio_reg_fcty->produce(GpioPortEnum::GPIO_PORT_C, GpioPinEnum::GPIO_PIN_1_, GpioModeEnum::GPIO_MODE_OUTPUT_PP_);
-  g = std::get<IGpio*>(r);
+void StartDefaultTask(void* argument) {
+    /* USER CODE BEGIN StartDefaultTask */
+    MX_USB_DEVICE_Init();
+    IGpio* g;
+    auto r = p_gpio_reg_fcty->produce(GpioPortEnum::GPIO_PORT_C, GpioPinEnum::GPIO_PIN_1_,
+                                      GpioModeEnum::GPIO_MODE_OUTPUT_PP_);
+    g      = std::get<IGpio*>(r);
 
-  auto s = g->enable();
+    auto s = g->enable();
 
-  /* Infinite loop */
-  for(;;)
-  {
-    s = g->toggle();
-    osDelay(100);
-  }
-  /* USER CODE END StartDefaultTask */
+    if (s != GpioErrCode::GPIO_SUCCESS) {
+        while (true)
+            ;
+    }
+
+    /* Infinite loop */
+    for (;;) {
+        s = g->toggle();
+        vTaskDelay(100);
+    }
+    /* USER CODE END StartDefaultTask */
 }
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 
 /* USER CODE END Application */
-

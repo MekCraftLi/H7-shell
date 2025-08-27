@@ -46,7 +46,7 @@
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN PFP */
-
+void hard_fault_handler_c(uint32_t *stack_addr);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -86,10 +86,17 @@ void NMI_Handler(void)
 /**
   * @brief This function handles Hard fault interrupt.
   */
-void HardFault_Handler(void)
+__attribute__((naked)) void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
-
+    __asm volatile
+    (
+        "TST lr, #4 \n"
+        "ITE EQ \n"
+        "MRSEQ r0, MSP \n"
+        "MRSNE r0, PSP \n"
+        "B hard_fault_handler_c \n"
+    );
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {
@@ -234,5 +241,20 @@ void MDMA_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
+void hard_fault_handler_c(uint32_t *stack_addr) {
+    uint32_t r0  = stack_addr[0];
+    uint32_t r1  = stack_addr[1];
+    uint32_t r2  = stack_addr[2];
+    uint32_t r3  = stack_addr[3];
+    uint32_t r12 = stack_addr[4];
+    uint32_t lr  = stack_addr[5];
+    uint32_t pc  = stack_addr[6];   // **触发 HardFault 的指令地址**
+    uint32_t psr = stack_addr[7];
 
+    // 这里可以打断点，或者用 printf/UART 输出
+    (void)r0; (void)r1; (void)r2; (void)r3;
+    (void)r12; (void)lr; (void)psr;
+
+    while(1);
+}
 /* USER CODE END 1 */

@@ -283,7 +283,7 @@ public:
 
 
 
-    W25QxxErr pageProgram(uint32_t address, void* pData, uint16_t len) const;
+    W25QxxErr pageProgram(uint32_t address, const void *pData, uint16_t len) const;
 
     W25QxxErr quadInputPageProgram(uint32_t address, const void* pData, uint16_t len) const;
 
@@ -365,6 +365,22 @@ public:
 
     [[nodiscard]] uint8_t getSusBit() const {return _statusRegister2 & (1 << 7);}
 
+    [[nodiscard]] uint64_t getSFDP() const {return _sfdpRegister;}
+
+    [[nodiscard]] uint8_t getSR1() const {return _statusRegister1;}
+
+    [[nodiscard]] uint8_t getSR2() const {return _statusRegister2;}
+
+    [[nodiscard]] uint8_t getSR3() const {return _statusRegister3;}
+
+    [[nodiscard]] uint8_t getMID() const {return _manufacturerID;}
+
+    [[nodiscard]] uint16_t getDevID16() const{return _deviceID16;}
+
+    [[nodiscard]] uint16_t getDevID8() const{return _deviceID8;}
+
+    [[nodiscard]] uint64_t getUniqueID() const{return _uniqueID;}
+
 
     /************* setter & getter *************/
 
@@ -378,7 +394,7 @@ public:
     uint8_t _statusRegister1     = 0x00;
     uint8_t _statusRegister2     = 0x00;
     uint8_t _statusRegister3     = 0x00;
-    uint16_t _sfdpRegister = 0;
+    uint64_t _sfdpRegister = 0;
     void* _commHandle            = nullptr;
     W25QxxCommModeEnum _commMode = W25QxxCommModeEnum::NONE;
     W25QxxSpiComm _spiComm;

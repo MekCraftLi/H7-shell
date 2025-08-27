@@ -72,6 +72,14 @@ add_executable(${CMAKE_PROJECT_NAME}
         Middlewares/Third_Party/LittleFs/lfs_util.c
         Adapters/adapter-lfs.cpp
         Adapters/adapter-lfs.h
+        Applications/ShellCmd/cmd-normal.cpp
+        Applications/ShellCmd/cmd-normal.h
+        Applications/app-shell.h
+        Applications/ShellCmd/cmd-task.cpp
+        Applications/ShellCmd/cmd-task.h
+        Applications/app-file.h
+        Applications/ShellCmd/cmd-file.h
+        Applications/ShellCmd/cmd-file.cpp
 )
 
 # Add STM32CubeMX generated sources

@@ -32,19 +32,26 @@
 /* ------- include ---------------------------------------------------------------------------------------------------*/
 
 #include "FreeRTOS.h"
+#include "cmsis_os.h"
+#include "cmsis_os2.h"
 #include "task.h"
 #include <cstdint>
 #include <string>
-#include "cmsis_os.h"
-#include "cmsis_os2.h"
 
+#include "event_groups.h"
 
 
 /* ------- class prototypes-------------------------------------------------------------------------------------------*/
 
 class IAppThread {
   public:
-    virtual ~IAppThread(){};
+    virtual ~IAppThread() {};
+
+    /**
+     * @brief 启动线程
+     */
+    virtual bool start() = 0;
+
     /**
      * @brief 初始化线程所需资源
      */
@@ -55,10 +62,6 @@ class IAppThread {
      */
     virtual void run()                                           = 0;
 
-    /**
-     * @brief 启动线程
-     */
-    virtual bool start()                                         = 0;
 
     /**
      * @brief 获取线程信息
@@ -68,6 +71,12 @@ class IAppThread {
     [[nodiscard]] virtual uint32_t getCpuUsage() const           = 0;
     [[nodiscard]] virtual uint32_t getStackHighWaterMark() const = 0;
     [[nodiscard]] virtual TaskHandle_t getTaskHandle() const     = 0;
+
+    void initializedSetter() {xEventGroupSetBits(_initEvent, 0x01);}
+    void waitInit() const {xEventGroupWaitBits(_initEvent, 0x01, pdFALSE, pdFALSE, portMAX_DELAY);}
+
+protected:
+    EventGroupHandle_t _initEvent;
 };
 
 
@@ -76,7 +85,9 @@ class IAppThread {
 class AppThreadBase : public IAppThread {
   public:
     AppThreadBase(const char* name, uint16_t stackSize, UBaseType_t priority)
-        : _name(name), _stackSize(stackSize), _priority(priority), _taskHanle(nullptr) {}
+        : _name(name), _stackSize(stackSize), _priority(priority), _taskHanle(nullptr){
+            _initEvent = xEventGroupCreate();
+        }
 
     // 统一启动线程
     bool start() override {
@@ -118,6 +129,7 @@ class AppThreadBase : public IAppThread {
     [[noreturn]] static void taskEntry(void* pvParameters) {
         auto* threadObj = static_cast<AppThreadBase*>(pvParameters);
         threadObj->init();
+        threadObj->initializedSetter();
         while (true) {
             threadObj->run();
         }

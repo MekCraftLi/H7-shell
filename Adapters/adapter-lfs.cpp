@@ -31,8 +31,6 @@
 #include "../../Middlewares/Third_Party/LittleFs/lfs_util.h"
 
 
-
-
 /* ------- class prototypes-----------------------------------------------------------------------------------------*/
 
 
@@ -63,7 +61,7 @@ int LfsAdapter::read(const struct lfs_config* c, lfs_block_t block, lfs_off_t of
 
     static_cast<void>(c);
     uint32_t addr = block * LFS_BLOCK_SIZE + off;
-    auto ret = _w25qxx->fastReadQuadOutput(addr, buffer, size);
+    auto ret = _w25qxx->readData(addr, buffer, size);
 
     if (ret != W25QxxErr::SUCCESS) {
         return LFS_ERR_IO;
@@ -105,7 +103,9 @@ int LfsAdapter::program(const struct lfs_config* c, lfs_block_t block, lfs_off_t
         if (ret != W25QxxErr::SUCCESS) {
             return LFS_ERR_IO;
         }
-        ret = _w25qxx->quadInputPageProgram(addr, buffer, chunk);
+
+        xSemaphoreTake(_waitForTxCplt, 0);
+        ret = _w25qxx->pageProgram(addr, buffer, chunk);
 
         if (ret != W25QxxErr::SUCCESS) {
             return LFS_ERR_IO;
@@ -115,7 +115,11 @@ int LfsAdapter::program(const struct lfs_config* c, lfs_block_t block, lfs_off_t
             return LFS_ERR_IO;
         };
 
-        _w25qxx->asyncWaitForFlag(W25QxxStateEnum::FREE);
+        ret = _w25qxx->asyncWaitForFlag(W25QxxStateEnum::FREE);
+
+        if (ret != W25QxxErr::SUCCESS) {
+            return LFS_ERR_IO;
+        }
 
 
         if (xSemaphoreTake(_waitForFlag, 1000) != pdTRUE) {
@@ -149,7 +153,7 @@ int LfsAdapter::erase(const struct lfs_config* c, lfs_block_t block) {
     if (xSemaphoreTake(_waitForCmd, 1000) != pdTRUE) {
         return LFS_ERR_IO;
     }
-
+    xSemaphoreTake(_waitForCmd, 0);
     ret = _w25qxx->sectorErase(addr);
 
     if (ret != W25QxxErr::SUCCESS) {
@@ -160,6 +164,7 @@ int LfsAdapter::erase(const struct lfs_config* c, lfs_block_t block) {
         return LFS_ERR_IO;
     }
     _w25qxx->asyncWaitForFlag(W25QxxStateEnum::FREE);
+
 
     if (xSemaphoreTake(_waitForFlag, 1000) != pdTRUE) {
         return LFS_ERR_IO;
