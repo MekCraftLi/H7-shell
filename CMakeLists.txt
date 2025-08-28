@@ -80,6 +80,10 @@ add_executable(${CMAKE_PROJECT_NAME}
         Applications/app-file.h
         Applications/ShellCmd/cmd-file.h
         Applications/ShellCmd/cmd-file.cpp
+        Applications/app-console.h
+        Applications/app-console.cpp
+        Applications/Utils/ringbuffer.h
+        Applications/Utils/ringBuffer.cpp
 )
 
 # Add STM32CubeMX generated sources

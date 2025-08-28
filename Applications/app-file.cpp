@@ -46,10 +46,25 @@ int16_t dirHandle(FsOptEnum opt, const char* path, uint8_t* buff, uint16_t buffL
 
 
 
+/* ------- application attribute -------------------------------------------------------------------------------------*/
+
+#define APPLICATION_NAME       "File"
+
+#define APPLICATION_STACK_SIZE 700
+
+#define APPLICATION_PRIORITY   4
+
+static StackType_t appStack[APPLICATION_STACK_SIZE];
+
+
+
+
+
 /* ------- variables -------------------------------------------------------------------------------------------------*/
 
-FileThread fileThread;
-AppThreadBase* pFileThread = &fileThread;
+static FileApp fileApp;
+static ConsoleApp& console = ConsoleApp::instance();
+
 static uint8_t lfs_read_buf[LFS_CACHE_SIZE];
 static uint8_t lfs_prog_buf[LFS_CACHE_SIZE];
 static uint8_t lfs_lookahead_buf[LFS_LOOKAHEAD_SIZE];
@@ -82,7 +97,15 @@ static struct lfs_config fcfg{
 
 /* ------- function implement ----------------------------------------------------------------------------------------*/
 
-void FileThread::init() {
+FileApp::FileApp()
+    : StaticAppBase(APPLICATION_NAME, APPLICATION_STACK_SIZE, APPLICATION_PRIORITY, appStack), _flash(&hospi1) {}
+
+FileApp &FileApp::instance() {
+    return fileApp;
+}
+
+
+void FileApp::init() {
 
 
     _waitForReceiveLock  = xSemaphoreCreateBinary();
@@ -112,17 +135,17 @@ void FileThread::init() {
                     sfdpLH, sfdpLL);
 
 
-    _flash.writeEnable();
-    auto r = _flash.writeRegister(W25QxxRegisterEnum::STATUS_REGISTER_1, 0x00);
+    auto r = _flash.writeEnable();
+    r = _flash.writeRegister(W25QxxRegisterEnum::STATUS_REGISTER_1, 0x00);
     (void)r;
     vTaskDelay(10);
 
-    _flash.writeEnable();
+    r = _flash.writeEnable();
     r = _flash.writeRegister(W25QxxRegisterEnum::STATUS_REGISTER_2, 0x02);
     (void)r;
     vTaskDelay(10);
 
-    _flash.writeEnable();
+    r = _flash.writeEnable();
     r = _flash.writeRegister(W25QxxRegisterEnum::STATUS_REGISTER_3, 0x00);
     (void)r;
     vTaskDelay(10);
@@ -173,7 +196,7 @@ void FileThread::init() {
         err = lfs_mount(&lfs, &fcfg);
 
         if (err) {
-            logError("Failed to format the flash. Error Code: %d", err);
+            console.error("Failed to format the flash. Error Code: %d", err);
             vTaskDelete(NULL);
         }
     }
@@ -181,7 +204,7 @@ void FileThread::init() {
     console.println("Mount LFS successfully");
 }
 
-void FileThread::run() {
+void FileApp::run() {
     FsMsg* pMsg;
     xQueueReceive(_request, &pMsg, portMAX_DELAY);
 
@@ -200,12 +223,12 @@ void FileThread::run() {
             break;
 
         default:
-            logError("File option undefined!");
+            console.error("File option undefined!");
             pMsg->finishReply();
     }
 }
 
-int16_t FileThread::readFile(const char* path, uint8_t* buffer, uint16_t bufferLen) const {
+int16_t FileApp::readFile(const char* path, uint8_t* buffer, uint16_t bufferLen) const {
     FsMsg msg(FsOptEnum::FILE_READ, path, buffer, bufferLen);
     FsMsg* pMsg = &msg;
     xQueueSend(_request, &pMsg, portMAX_DELAY);
@@ -237,12 +260,12 @@ int16_t fileHandle(FsOptEnum opt, const char* path, uint8_t* buffer, uint16_t bu
             flg = LFS_O_CREAT | LFS_O_EXCL | LFS_O_TRUNC;
             break;
         default:
-            logError("File option undefined!");
+            console.error("File option undefined!");
     }
 
     ret = lfs_file_open(&lfs, &file, path, flg);
     if (ret < 0) {
-        logError("Open file failed :\"%s\"", path);
+        console.error("Open file failed :\"%s\"", path);
         return ret;
     }
 
@@ -251,14 +274,14 @@ int16_t fileHandle(FsOptEnum opt, const char* path, uint8_t* buffer, uint16_t bu
         len = lfs_file_read(&lfs, &file, buffer, buffLen);
 
         if (len < 0) {
-            logError("Read file failed :\"%s\"", path);
+            console.error("Read file failed :\"%s\"", path);
             return len;
         }
     } else if (opt != FsOptEnum::FILE_CREATE_NEW) {
         len = lfs_file_write(&lfs, &file, buffer, buffLen);
 
         if (len < 0) {
-            logError("Write file failed :\"%s\"", path);
+            console.error("Write file failed :\"%s\"", path);
             return len;
         }
     }
@@ -266,7 +289,7 @@ int16_t fileHandle(FsOptEnum opt, const char* path, uint8_t* buffer, uint16_t bu
     ret = lfs_file_close(&lfs, &file);
 
     if (ret < 0) {
-        logError("Close file failed :\"%s\"", path);
+        console.error("Close file failed :\"%s\"", path);
 
         // close failed clear the file structure.
         memset(&file, 0, sizeof(file));
@@ -278,17 +301,19 @@ int16_t fileHandle(FsOptEnum opt, const char* path, uint8_t* buffer, uint16_t bu
 int16_t dirHandle(FsOptEnum opt, const char* path, uint8_t* buff, uint16_t buffLen) {
     auto ret = lfs_dir_open(&lfs, &dir, path);
     if (ret < 0) {
-        logError("Failed to open path :%s", path);
+        console.error("Failed to open path :%s", path);
         return ret;
     }
 
     uint16_t size   = 0;
     uint16_t offset = 0;
+    uint16_t len        = 0;
+
 
     while (true) {
         int res = lfs_dir_read(&lfs, &dir, &info);
         if (res < 0) {
-            logError("Failed to read dir info");
+            console.error("Failed to read dir info");
             break;
         }
 
@@ -296,17 +321,16 @@ int16_t dirHandle(FsOptEnum opt, const char* path, uint8_t* buff, uint16_t buffL
             break;
         }
 
-        uint16_t len = 0;
 
         const char* typeStr = (info.type == LFS_TYPE_REG) ? "file" : "dir ";
-        len = sprintf(reinterpret_cast<char*>(buff + offset),
-                      "%-5s %-24s %ld\r\n", // type 最宽5字符，name 宽24字符
-                      typeStr, info.name, info.size);
+        len                 = sprintf(reinterpret_cast<char*>(buff + offset),
+                                      "%-5s %-24s %ld\r\n", // type 最宽5字符，name 宽24字符
+                                      typeStr, info.name, info.size);
 
         offset += len;
 
         if (offset >= buffLen) {
-            logError("Buffer overflow");
+            console.error("Buffer overflow");
             return 0;
         }
 
@@ -318,53 +342,53 @@ int16_t dirHandle(FsOptEnum opt, const char* path, uint8_t* buff, uint16_t buffL
 
     memset(&info, 0, sizeof(info));
 
-    return size;
+    return offset;
 }
 
 
-int8_t FileThread::writeAndMakeFile(const char* path, const char* buffer, uint16_t bufferLen) const {
+int8_t FileApp::writeAndMakeFile(const char* path, const char* buffer, uint16_t bufferLen) const {
     FsMsg msg(FsOptEnum::FILE_WRITE_AND_MAKE, path, (uint8_t*)buffer, bufferLen);
     FsMsg* pMsg = &msg;
     xQueueSend(_request, &pMsg, portMAX_DELAY);
     if (!msg.waitForReply()) {
-        logError("Error while send request to the file thread");
+        console.error("Error while send request to the file thread");
         return -1;
     }
 
     return msg.getReturn();
 }
 
-int8_t FileThread::appendFile(const char* path, const char* buffer, uint16_t bufferLen) const {
+int8_t FileApp::appendFile(const char* path, const char* buffer, uint16_t bufferLen) const {
     FsMsg msg(FsOptEnum::FILE_APPEND, path, (uint8_t*)buffer, bufferLen);
     FsMsg* pMsg = &msg;
     xQueueSend(_request, &pMsg, portMAX_DELAY);
     if (!msg.waitForReply()) {
-        logError("Error while send request to the file thread");
+        console.error("Error while send request to the file thread");
         return -1;
     }
 
     return msg.getReturn();
 }
 
-int8_t FileThread::createFile(const char* path) const {
+int8_t FileApp::createFile(const char* path) const {
     FsMsg msg(FsOptEnum::FILE_CREATE_NEW, path);
     FsMsg* pMsg = &msg;
     xQueueSend(_request, &pMsg, portMAX_DELAY);
     if (!msg.waitForReply()) {
-        logError("Error while send request to the file thread");
+        console.error("Error while send request to the file thread");
         return -1;
     }
 
     return msg.getReturn();
 }
 
-int8_t FileThread::readDir(const char* path, uint8_t* buffer, uint16_t bufferLen) const {
+int16_t FileApp::readDir(const char* path, uint8_t* buffer, uint16_t bufferLen) const {
     FsMsg msg(FsOptEnum::DIR_READ, path, buffer, bufferLen);
     FsMsg* pMsg = &msg;
 
     xQueueSend(_request, &pMsg, portMAX_DELAY);
     if (!msg.waitForReply()) {
-        logError("Error while send request to the file thread");
+        console.error("Error while send request to the file thread");
         return -1;
     }
 
@@ -372,7 +396,7 @@ int8_t FileThread::readDir(const char* path, uint8_t* buffer, uint16_t bufferLen
 }
 
 
-int8_t FileThread::writeFile(const char* path, const char* buffer, uint16_t bufferLen) const {
+int8_t FileApp::writeFile(const char* path, const char* buffer, uint16_t bufferLen) const {
     FsMsg msg(FsOptEnum::FILE_WRITE, path, (uint8_t*)buffer, bufferLen);
     FsMsg* pMsg = &msg;
     xQueueSend(_request, &pMsg, portMAX_DELAY);
@@ -387,7 +411,7 @@ void HAL_OSPI_RxCpltCallback(OSPI_HandleTypeDef* hospi) {
 
     if (hospi == &hospi1) {
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        xSemaphoreGiveFromISR(fileThread._waitForReceiveLock, &xHigherPriorityTaskWoken);
+        xSemaphoreGiveFromISR(fileApp._waitForReceiveLock, &xHigherPriorityTaskWoken);
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }
 }
@@ -396,7 +420,7 @@ void HAL_OSPI_CmdCpltCallback(OSPI_HandleTypeDef* hospi) {
 
     if (hospi == &hospi1) {
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        xSemaphoreGiveFromISR(fileThread._waitForCmd, &xHigherPriorityTaskWoken);
+        xSemaphoreGiveFromISR(fileApp._waitForCmd, &xHigherPriorityTaskWoken);
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }
 }
@@ -405,7 +429,7 @@ void HAL_OSPI_TxCpltCallback(OSPI_HandleTypeDef* hospi) {
 
     if (hospi == &hospi1) {
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        xSemaphoreGiveFromISR(fileThread._waitForTransmitLock, &xHigherPriorityTaskWoken);
+        xSemaphoreGiveFromISR(fileApp._waitForTransmitLock, &xHigherPriorityTaskWoken);
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }
 }
@@ -413,7 +437,7 @@ void HAL_OSPI_TxCpltCallback(OSPI_HandleTypeDef* hospi) {
 void HAL_OSPI_StatusMatchCallback(OSPI_HandleTypeDef* hospi) {
     if (hospi == &hospi1) {
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        xSemaphoreGiveFromISR(fileThread._waitForFlag, &xHigherPriorityTaskWoken);
+        xSemaphoreGiveFromISR(fileApp._waitForFlag, &xHigherPriorityTaskWoken);
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }
 }

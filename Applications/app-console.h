@@ -1,6 +1,6 @@
 /**
  *******************************************************************************
- * @file    app-shell.h
+ * @file    app-console.h
  * @brief   简要描述
  *******************************************************************************
  * @attention
@@ -8,13 +8,13 @@
  * none
  *
  *******************************************************************************
- * @note
+ * @notes
  *
  * none
  *
  *******************************************************************************
  * @author  MekLi
- * @date    2025/8/26
+ * @date    2025/8/28
  * @version 1.0
  *******************************************************************************
  */
@@ -26,26 +26,19 @@
 
 
 
-
 /*-------- 1. includes and imports -----------------------------------------------------------------------------------*/
-
 
 /* I. interface */
 #include "app-intf.h"
 
 /* II. OS */
-#include "message_buffer.h"
+#include "queue.h"
 
 /* III. middlewares */
-#include "../../Middlewares/Third_Party/LetterShell/log/log.h"
-#include "../../Middlewares/Third_Party/LetterShell/shell_cpp.h"
 #include "Utils/ringBuffer.h"
 
 /* IV. drivers */
 #include "../../Drivers/Communications/comm-intf.h"
-
-/* V. standard lib */
-#include <cstring>
 
 
 
@@ -55,41 +48,61 @@
 
 
 
+
 /*-------- 3. interface ---------------------------------------------------------------------------------------------*/
 
-class ShellApp final : public StaticAppBase {
+/* 1. thread interface */
+class ConsoleApp final : public StaticAppBase {
   public:
-    ShellApp();
+    ConsoleApp();
 
     void init() override;
-
     void run() override;
 
-    void sendMsg(uint8_t *data, uint16_t len);
+    /**
+     * @brief
+     * @param fmt format
+     * @param ... var
+     */
+    void println(const char* fmt, ...);
+    void error(const char* fmt, ...);
+    void output(void* data, uint16_t len);
 
-    /************ setter & getter ***********/
-    static ShellApp& instance();
-    Shell* getShell() { return &_shell; }
-    Log& getLog() { return _log; }
+    /**
+     * @brief get the instance of application
+     * @return instance of application
+     */
+    static ConsoleApp& instance();
 
   private:
-    /* message interface */
+    IComm* _comm{};
+    xQueueHandle _logQueue{};
     RingBuffer _rb1;
     RingBuffer _rb2;
-    uint8_t _index;
-
-    Shell _shell;
-    Log _log;
-
-
-    friend int16_t shellWrite(char* data, uint16_t len);
-    friend void logWrite(char* data, int16_t len);
+    uint8_t _index{};
 };
 
+/* 2. queue message interface */
+class LogMsg {
+  public:
+    LogMsg() {}
+
+    LogMsg(const std::string& str) : _msg(str.c_str()), _len(str.length()) {}
+
+    LogMsg(const char* str, uint16_t len) : _msg(str), _len(len) {}
+
+    const char* getMsg() { return _msg; }
+
+    [[nodiscard]] uint16_t getMsgLen() const { return _len; }
+
+  private:
+    const char* _msg;
+    uint16_t _len;
+};
+
+
+
 /*-------- 4. decorator ----------------------------------------------------------------------------------------------*/
-
-
-
 
 
 /*-------- 5. factories ----------------------------------------------------------------------------------------------*/

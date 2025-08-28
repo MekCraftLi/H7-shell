@@ -25,8 +25,11 @@
 
 /* ------- include ---------------------------------------------------------------------------------------------------*/
 
+#include <cstring>
+
 #include "FreeRTOS.h"
 #include "task.h"
+
 
 
 
@@ -34,7 +37,7 @@
 /* ------- class prototypes-----------------------------------------------------------------------------------------*/
 
 extern "C" {
-    void vApplicationStackOverflowHook (TaskHandle_t xTask, signed char *pcTaskName);
+void vApplicationStackOverflowHook(TaskHandle_t xTask, signed char* pcTaskName);
 }
 
 
@@ -46,7 +49,9 @@ extern "C" {
 
 /* ------- function implement ----------------------------------------------------------------------------------------*/
 
- void vApplicationStackOverflowHook (TaskHandle_t xTask, signed char *pcTaskName) {
-    while (true);
-}
+void vApplicationStackOverflowHook(TaskHandle_t xTask, signed char* pcTaskName) {
 
+
+    while (true)
+        ;
+}

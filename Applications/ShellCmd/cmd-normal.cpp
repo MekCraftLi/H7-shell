@@ -46,14 +46,14 @@
 
 
 int func(int i, char ch, char* str) {
-    shellPrint(shellThread.getShell(), "input int: %d, char: %c, string: %s\r\n", i, ch, str);
+    shellPrint(ShellApp::instance().getShell(), "input int: %d, char: %c, string: %s\r\n", i, ch, str);
     return 0;
 }
 
 int mainFunc(int argc, char* argv[]) {
-    shellPrint(shellThread.getShell(), "%dparameter(s)\r\n", argc);
+    shellPrint(ShellApp::instance().getShell(), "%dparameter(s)\r\n", argc);
     for (uint8_t i = 0; i < argc; i++) {
-        shellPrint(shellThread.getShell(), "%s\r\n", argv[i]);
+        shellPrint(ShellApp::instance().getShell(), "%s\r\n", argv[i]);
     }
 
     return 0;

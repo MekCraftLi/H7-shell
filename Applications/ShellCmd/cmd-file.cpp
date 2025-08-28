@@ -37,6 +37,7 @@
 
 static uint8_t fileBuffer[1024];
 static uint8_t currentPath[64] = "/";
+static ConsoleApp& console = ConsoleApp::instance();
 
 /* ------- function implement ----------------------------------------------------------------------------------------*/
 
@@ -49,7 +50,7 @@ int cat(int argc, char* argv[]) {
     }
 
     memset(fileBuffer, 0, sizeof(fileBuffer));
-    auto len = fileThread.readFile(argv[1], fileBuffer, 1024);
+    auto len = FileApp::instance().readFile(argv[1], fileBuffer, 1024);
 
     if (len > 0) {
         fileBuffer[len + 1] = 0;
@@ -75,9 +76,9 @@ int echo(int argc, char* argv[]) {
     logPrintln("len: %d", len);
 
     if (argv[2][1] == '>') {
-        return fileThread.appendFile(argv[3], argv[1], len);
+        return FileApp::instance().appendFile(argv[3], argv[1], len);
     }
-    return fileThread.writeFile(argv[3], argv[1], len);
+    return FileApp::instance().writeFile(argv[3], argv[1], len);
 }
 
 int touch(int argc, char* argv[]) {
@@ -85,7 +86,7 @@ int touch(int argc, char* argv[]) {
         logPrintln("ERROR: Too few arguments");
         return -1;
     }
-    return fileThread.createFile(argv[1]);
+    return FileApp::instance().createFile(argv[1]);
 }
 
 int ls(int argc, char* argv[]) {
@@ -99,15 +100,16 @@ int ls(int argc, char* argv[]) {
         path = reinterpret_cast<uint8_t*>(argv[1]);
     }
 
-    auto ret = fileThread.readDir(reinterpret_cast<const char*>(path), fileBuffer, 1024);
+    auto ret = FileApp::instance().readDir(reinterpret_cast<const char*>(path), fileBuffer, 1024);
 
     if (ret == -1) {
         return ret;
     }
 
-    logPrintln("\r\n\r\n Direction: %s \r\n\r\ntype  name                     size\r\n====  =================        "
-               "========\r\n%s\r\n",
-               path, fileBuffer);
+    console.println("\r\n\r\n Direction: %s \r\n\r\ntype  name                     size\r\n====  =================        "
+               "========\r\n", path);
+
+    console.output(reinterpret_cast<char *>(fileBuffer), ret);
 
     return 0;
 }

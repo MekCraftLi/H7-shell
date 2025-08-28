@@ -31,26 +31,23 @@
 
 /* ------- include ---------------------------------------------------------------------------------------------------*/
 
+/* I. OS */
 #include "FreeRTOS.h"
-#include "cmsis_os.h"
-#include "cmsis_os2.h"
-#include "task.h"
-#include <cstdint>
-#include <string>
-
 #include "event_groups.h"
+#include "task.h"
+#include "queue.h"
+
+/* II. standard lib */
+#include <vector>
+
+#include "stream_buffer.h"
 
 
 /* ------- class prototypes-------------------------------------------------------------------------------------------*/
 
-class IAppThread {
+class IApplication {
   public:
-    virtual ~IAppThread() {};
-
-    /**
-     * @brief 启动线程
-     */
-    virtual bool start() = 0;
+    virtual ~IApplication() {};
 
     /**
      * @brief 初始化线程所需资源
@@ -67,74 +64,107 @@ class IAppThread {
      * @brief 获取线程信息
      */
     [[nodiscard]] virtual const char* getName() const            = 0;
-    [[nodiscard]] virtual uint32_t getRunTime() const            = 0;
-    [[nodiscard]] virtual uint32_t getCpuUsage() const           = 0;
+    [[nodiscard]] virtual float getRunTime() const               = 0;
     [[nodiscard]] virtual uint32_t getStackHighWaterMark() const = 0;
     [[nodiscard]] virtual TaskHandle_t getTaskHandle() const     = 0;
 
-    void initializedSetter() {xEventGroupSetBits(_initEvent, 0x01);}
-    void waitInit() const {xEventGroupWaitBits(_initEvent, 0x01, pdFALSE, pdFALSE, portMAX_DELAY);}
+    virtual void initEvent()                                     = 0;
+    virtual void waitInit()                                      = 0;
 
-protected:
-    EventGroupHandle_t _initEvent;
+  protected:
+    EventGroupHandle_t _initEvent = nullptr;
+
+    class TaskInfo {
+      public:
+        TaskInfo(const char* name, uint16_t stackSize, IApplication* pThread, UBaseType_t priority,
+                 StackType_t* stackBuf, StaticTask_t* pxTask)
+            : name(name), stackSize(stackSize), pThread(pThread), priority(priority), stackBuf(stackBuf),
+              pxTask(pxTask) {}
+        const char* name       = nullptr;
+        uint16_t stackSize     = 0;
+        IApplication* pThread  = nullptr;
+        UBaseType_t priority   = 0;
+        TaskHandle_t tskHandle = nullptr;
+        StackType_t* stackBuf  = nullptr;
+        StaticTask_t* pxTask   = nullptr;
+    };
+
+    inline static std::vector<TaskInfo> _taskInfoRegistry;
+
+    float _cpuUsage   = 0;
+    float _stackUsage = 0;
+    float _timeUsage  = 0;
 };
 
 
 
-
-class AppThreadBase : public IAppThread {
+class StaticAppBase : public IApplication {
   public:
-    AppThreadBase(const char* name, uint16_t stackSize, UBaseType_t priority)
-        : _name(name), _stackSize(stackSize), _priority(priority), _taskHanle(nullptr){
-            _initEvent = xEventGroupCreate();
-        }
+    StaticAppBase(const char* name, uint16_t stackSize, UBaseType_t priority, StackType_t* stackBuf)
+        : _taskInfo(name, stackSize, this, priority, stackBuf, &_staticTask) {
 
-    // 统一启动线程
-    bool start() override {
-        BaseType_t result = xTaskCreate(taskEntry, // 静态入口函数
-                                        _name, _stackSize,
-                                        this, // 将对象指针传给任务
-                                        _priority, &_taskHanle);
-        return result == pdPASS;
+        /* event */
+        _initEvent = xEventGroupCreateStatic(&_staticEventGroup);
+
+        /* task */
+        _registerThread(_taskInfo);
     }
 
-    [[nodiscard]] const char* getName() const override { return _name; }
+    /**
+     * @brief start all applications initialized.
+     */
+    static void startApplications() {
+        for (auto eachApp : _taskInfoRegistry) {
 
+            eachApp.tskHandle = xTaskCreateStatic(_taskEntry, eachApp.name, eachApp.stackSize, eachApp.pThread,
+                                                  eachApp.priority, eachApp.stackBuf, eachApp.pxTask);
+        }
+    }
+
+    /**
+     * @brief set the initialization event
+     */
+    void initEvent() override { xEventGroupSetBits(_initEvent, 0x01); }
+
+    /**
+     * @brief waiting for the initialization event of application
+     */
+    void waitInit() override { xEventGroupWaitBits(_initEvent, 0x01, pdFALSE, pdFALSE, portMAX_DELAY); }
+
+
+
+    /************* setter & getter **************/
+    [[nodiscard]] const char* getName() const override { return _taskInfo.name; }
 
     [[nodiscard]] uint32_t getStackHighWaterMark() const override {
-        if (_taskHanle)
-            return uxTaskGetStackHighWaterMark(_taskHanle);
-        return 0;
+        return uxTaskGetStackHighWaterMark(_taskInfo.tskHandle);
     }
 
+    [[nodiscard]] TaskHandle_t getTaskHandle() const override { return _taskInfo.tskHandle; }
 
-    [[nodiscard]] TaskHandle_t getTaskHandle() const override { return _taskHanle; }
-
-    // 可选实现：CPU占用率和运行时间
-    [[nodiscard]] uint32_t getRunTime() const override { return 0; }
-
-
-    [[nodiscard]] uint32_t getCpuUsage() const override { return 0; }
+    [[nodiscard]] float getRunTime() const override { return _runTime; }
 
   protected:
-    const char* _name;
-    uint16_t _stackSize;
-    UBaseType_t _priority;
-    TaskHandle_t _taskHanle;
-    float _cpuUsage;
-    float _stackUsage;
-    float _timeUsage;
+    TaskInfo _taskInfo;
+    StaticEventGroup_t _staticEventGroup;
+    StaticTask_t _staticTask;
+    QueueHandle_t _queue;
+    StaticQueue_t _staticQueue;
+    float _runTime = 0;
 
-    // 静态任务入口，用于FreeRTOS
-    [[noreturn]] static void taskEntry(void* pvParameters) {
-        auto* threadObj = static_cast<AppThreadBase*>(pvParameters);
+  private:
+    static void _registerThread(const TaskInfo& taskInfo) { _taskInfoRegistry.push_back(taskInfo); }
+
+    [[noreturn]] static void _taskEntry(void* pvParameters) {
+        auto* threadObj = static_cast<StaticAppBase*>(pvParameters);
         threadObj->init();
-        threadObj->initializedSetter();
+        threadObj->initEvent();
         while (true) {
             threadObj->run();
         }
     }
 };
+
 
 
 /* ------- macro -----------------------------------------------------------------------------------------------------*/
@@ -145,9 +175,9 @@ class AppThreadBase : public IAppThread {
 
 /* ------- variables -------------------------------------------------------------------------------------------------*/
 
-extern AppThreadBase* _p_shell_thread;
-extern AppThreadBase* pFileThread;
-
+extern StaticAppBase* _p_shell_thread;
+extern StaticAppBase* pFileThread;
+extern StaticAppBase* pConsoleThread;
 
 
 /* ------- function implement ----------------------------------------------------------------------------------------*/

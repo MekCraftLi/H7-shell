@@ -28,15 +28,29 @@
 
 /*-------- 1. includes and imports -----------------------------------------------------------------------------------*/
 
-#include "../../Drivers/Devices/w25qxx.h"
-#include "../../Drivers/Services/serv-time.h"
-#include "../Adapters/adapter-lfs.h"
-#include "../Middlewares/Third_Party/LittleFs/lfs.h"
-#include "FreeRTOS.h"
+// #include "../../Drivers/Devices/w25qxx.h"
+// #include "../../Drivers/Services/serv-time.h"
+// #include "../Adapters/adapter-lfs.h"
+// #include "../Middlewares/Third_Party/LittleFs/lfs.h"
+// #include "FreeRTOS.h"
+// #include "app-intf.h"
+// #include "app-shell.h"
+// #include "octospi.h"
+// #include "semphr.h"
+
+/* I. interface */
 #include "app-intf.h"
-#include "app-shell.h"
+
+/* II. OS */
+
+
+/* III. middlewares */
+#include "app-console.h"
+#include "../Adapters/adapter-lfs.h"
+
+/* IV. drivers */
+#include "../../Drivers/Devices/w25qxx.h"
 #include "octospi.h"
-#include "semphr.h"
 
 
 
@@ -116,10 +130,11 @@ class FsMsg {
 
 
 
-class FileThread : public AppThreadBase {
+class FileApp : public StaticAppBase {
 
   public:
-    FileThread() : AppThreadBase("File", 768, 4), _flash(&hospi1) {}
+    FileApp();
+    static FileApp& instance();
 
     void init() override;
 
@@ -131,7 +146,7 @@ class FileThread : public AppThreadBase {
     int8_t appendFile(const char* path, const char* buffer, uint16_t bufferLen) const;
     int8_t createFile(const char* path) const;
 
-    int8_t readDir(const char* path, uint8_t* buffer, uint16_t bufferLen) const;
+    int16_t readDir(const char *path, uint8_t *buffer, uint16_t bufferLen) const;
     int8_t remove(const char* path);
     int8_t makeDir(const char* path);
     int8_t rename(const char* path);
@@ -150,6 +165,7 @@ class FileThread : public AppThreadBase {
     xSemaphoreHandle _waitForFlag;
     LfsAdapter _lfsAdapter;
     float _runTime;
+
     friend void HAL_OSPI_RxCpltCallback(OSPI_HandleTypeDef*);
     friend void HAL_OSPI_CmdCpltCallback(OSPI_HandleTypeDef*);
     friend void HAL_OSPI_TxCpltCallback(OSPI_HandleTypeDef*);
@@ -161,5 +177,3 @@ class FileThread : public AppThreadBase {
 
 
 /*-------- 5. factories ----------------------------------------------------------------------------------------------*/
-
-extern FileThread fileThread;
