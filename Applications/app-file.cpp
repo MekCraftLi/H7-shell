@@ -36,7 +36,7 @@
 
 int16_t fileHandle(FsOptEnum opt, const char* path, uint8_t* buff, uint16_t buffLen);
 int16_t dirHandle(FsOptEnum opt, const char* path, uint8_t* buff, uint16_t buffLen);
-
+int16_t removeHandle(const char* path);
 
 
 
@@ -100,9 +100,7 @@ static struct lfs_config fcfg{
 FileApp::FileApp()
     : StaticAppBase(APPLICATION_NAME, APPLICATION_STACK_SIZE, APPLICATION_PRIORITY, appStack), _flash(&hospi1) {}
 
-FileApp &FileApp::instance() {
-    return fileApp;
-}
+FileApp& FileApp::instance() { return fileApp; }
 
 
 void FileApp::init() {
@@ -122,7 +120,7 @@ void FileApp::init() {
     _lfsAdapter.config(&_flash, _waitForFlag, _waitForTransmitLock, _waitForCmd, _waitForReceiveLock);
 
 
-    console.waitInit();
+    ShellApp::instance().waitInit();
 
     _flash.enquireSfdpRegisterAsync();
     xSemaphoreTake(_waitForReceiveLock, portMAX_DELAY);
@@ -131,12 +129,12 @@ void FileApp::init() {
     uint16_t sfdpHL = _flash.getSFDP() >> 32;
     uint16_t sfdpLH = _flash.getSFDP() >> 16;
     uint16_t sfdpLL = _flash.getSFDP();
-    console.println("[W25Q64] Initialization infomation:\r\nSFDP Register\t\t: %04X %04X %04X %04X", sfdpHH, sfdpHL,
+    logPrintln("[W25Q64] Initialization infomation:\r\nSFDP Register\t\t: %04X %04X %04X %04X", sfdpHH, sfdpHL,
                     sfdpLH, sfdpLL);
 
 
     auto r = _flash.writeEnable();
-    r = _flash.writeRegister(W25QxxRegisterEnum::STATUS_REGISTER_1, 0x00);
+    r      = _flash.writeRegister(W25QxxRegisterEnum::STATUS_REGISTER_1, 0x00);
     (void)r;
     vTaskDelay(10);
 
@@ -162,18 +160,18 @@ void FileApp::init() {
     xSemaphoreTake(_waitForReceiveLock, 50);
     _flash.asyncRxCallback();
 
-    console.println("Status Register 1\t: 0x%02X\r\nStatus Register 2\t: 0x%02X\r\nStatus Register 3\t: 0x%02X",
+    logPrintln("Status Register 1\t: 0x%02X\r\nStatus Register 2\t: 0x%02X\r\nStatus Register 3\t: 0x%02X",
                     _flash.getSR1(), _flash.getSR2(), _flash.getSR3());
 
     _flash.enquireJedecIdAsync();
     xSemaphoreTake(_waitForReceiveLock, 50);
     _flash.asyncRxCallback();
-    console.println("Manufacturer ID\t\t: %02X\r\nDevice ID - 16\t\t: %04X", _flash.getMID(), _flash.getDevID16());
+    logPrintln("Manufacturer ID\t\t: %02X\r\nDevice ID - 16\t\t: %04X", _flash.getMID(), _flash.getDevID16());
 
     _flash.enquireDeviceIdAsync();
     xSemaphoreTake(_waitForReceiveLock, 50);
     _flash.asyncRxCallback();
-    console.println("Device ID - 8\t\t: %02X", _flash.getDevID8());
+    logPrintln("Device ID - 8\t\t: %02X", _flash.getDevID8());
 
     _flash.enquireUniqueIdAsync();
     xSemaphoreTake(_waitForReceiveLock, 50);
@@ -183,14 +181,14 @@ void FileApp::init() {
     uint16_t uniqueIDHL = uniqueID >> 32;
     uint16_t uniqueIDLH = uniqueID >> 16;
     uint16_t uniqueIDLL = uniqueID;
-    console.println("Unique ID\t\t: %04X %04X %04X %04X\r\n", uniqueIDHH, uniqueIDHL, uniqueIDLH, uniqueIDLL);
+    logPrintln("Unique ID\t\t: %04X %04X %04X %04X\r\n", uniqueIDHH, uniqueIDHL, uniqueIDLH, uniqueIDLL);
 
 
 
     auto err = lfs_mount(&lfs, &fcfg);
 
     if (err) {
-        console.println("Failed to mount LFS. Format the flash.");
+        logPrintln("Failed to mount LFS. Format the flash.");
         lfs_format(&lfs, &fcfg);
 
         err = lfs_mount(&lfs, &fcfg);
@@ -201,7 +199,7 @@ void FileApp::init() {
         }
     }
 
-    console.println("Mount LFS successfully");
+    logPrintln("Mount LFS successfully");
 }
 
 void FileApp::run() {
@@ -218,7 +216,13 @@ void FileApp::run() {
             pMsg->finishReply();
             break;
         case FsOptEnum::DIR_READ:
+        case FsOptEnum::DIR_OPEN:
+        case FsOptEnum::DIR_MAKE:
             pMsg->setReturn(dirHandle(pMsg->getOpt(), pMsg->getPath(), pMsg->getBuffer(), pMsg->getBufferLen()));
+            pMsg->finishReply();
+            break;
+        case FsOptEnum::REMOVE:
+            pMsg->setReturn(removeHandle(pMsg->getPath()));
             pMsg->finishReply();
             break;
 
@@ -299,7 +303,15 @@ int16_t fileHandle(FsOptEnum opt, const char* path, uint8_t* buffer, uint16_t bu
 }
 
 int16_t dirHandle(FsOptEnum opt, const char* path, uint8_t* buff, uint16_t buffLen) {
-    auto ret = lfs_dir_open(&lfs, &dir, path);
+    int ret = 0;
+    if (opt == FsOptEnum::DIR_MAKE) {
+        ret = lfs_mkdir(&lfs, path);
+        if (ret < 0) {
+            console.error("Create directory failed :\"%s\"", path);
+        }
+        return ret;
+    }
+    ret = lfs_dir_open(&lfs, &dir, path);
     if (ret < 0) {
         console.error("Failed to open path :%s", path);
         return ret;
@@ -307,42 +319,68 @@ int16_t dirHandle(FsOptEnum opt, const char* path, uint8_t* buff, uint16_t buffL
 
     uint16_t size   = 0;
     uint16_t offset = 0;
-    uint16_t len        = 0;
+    uint16_t len    = 0;
 
 
-    while (true) {
-        int res = lfs_dir_read(&lfs, &dir, &info);
-        if (res < 0) {
-            console.error("Failed to read dir info");
-            break;
+    if (opt == FsOptEnum::DIR_READ) {
+
+
+        while (true) {
+            ret = lfs_dir_read(&lfs, &dir, &info);
+            if (ret < 0) {
+                console.error("Failed to read dir info");
+                return ret;
+            }
+
+            if (ret == 0) {
+                break;
+            }
+
+
+            const char* typeStr = (info.type == LFS_TYPE_REG) ? "file" : "dir ";
+            len                 = sprintf(reinterpret_cast<char*>(buff + offset),
+                                          "%-5s %-24s %ld\r\n", // type 最宽5字符，name 宽24字符
+                                          typeStr, info.name, info.size);
+
+            offset += len;
+
+            if (offset >= buffLen) {
+                console.error("Buffer overflow");
+                return 0;
+            }
+
+
+            size++;
         }
 
-        if (res == 0) {
-            break;
-        }
 
-
-        const char* typeStr = (info.type == LFS_TYPE_REG) ? "file" : "dir ";
-        len                 = sprintf(reinterpret_cast<char*>(buff + offset),
-                                      "%-5s %-24s %ld\r\n", // type 最宽5字符，name 宽24字符
-                                      typeStr, info.name, info.size);
-
-        offset += len;
-
-        if (offset >= buffLen) {
-            console.error("Buffer overflow");
-            return 0;
-        }
-
-
-        size++;
     }
 
-    lfs_dir_close(&lfs, &dir);
+    auto cRet = lfs_dir_close(&lfs, &dir);
+
+    if (cRet < 0) {
+        console.error("Failed to close dir");
+        memset(&dir, 0, sizeof(dir));
+        return cRet;
+    }
 
     memset(&info, 0, sizeof(info));
 
-    return offset;
+    if (offset){
+        ret = offset;
+    }
+
+    return ret;
+}
+
+int16_t removeHandle(const char *path) {
+    int ret = 0;
+
+        ret = lfs_remove(&lfs, path);
+        if (ret < 0) {
+            console.error("remove failed :%s", path);
+        }
+        return ret;
 }
 
 
@@ -395,6 +433,45 @@ int16_t FileApp::readDir(const char* path, uint8_t* buffer, uint16_t bufferLen) 
     return msg.getReturn();
 }
 
+int8_t FileApp::makeDir(const char *path) {
+    FsMsg msg(FsOptEnum::DIR_MAKE, path, nullptr,0);
+    FsMsg* pMsg = &msg;
+
+    xQueueSend(_request, &pMsg, portMAX_DELAY);
+    if (!msg.waitForReply()) {
+        console.error("Error while send request to the file thread");
+        return -1;
+    }
+
+    return msg.getReturn();
+}
+
+int8_t FileApp::openDir(const char* path) {
+    FsMsg msg(FsOptEnum::DIR_OPEN, path, nullptr,0);
+    FsMsg* pMsg = &msg;
+
+    xQueueSend(_request, &pMsg, portMAX_DELAY);
+    if (!msg.waitForReply()) {
+        console.error("Error while send request to the file thread");
+        return -1;
+    }
+
+    return msg.getReturn();
+
+}
+
+int8_t FileApp::remove(const char* path) {
+    FsMsg msg(FsOptEnum::REMOVE, path, nullptr,0);
+    FsMsg* pMsg = &msg;
+
+    xQueueSend(_request, &pMsg, portMAX_DELAY);
+    if (!msg.waitForReply()) {
+        console.error("Error while send request to the file thread");
+        return -1;
+    }
+
+    return msg.getReturn();
+}
 
 int8_t FileApp::writeFile(const char* path, const char* buffer, uint16_t bufferLen) const {
     FsMsg msg(FsOptEnum::FILE_WRITE, path, (uint8_t*)buffer, bufferLen);

@@ -28,24 +28,14 @@
 
 /*-------- 1. includes and imports -----------------------------------------------------------------------------------*/
 
-// #include "../../Drivers/Devices/w25qxx.h"
-// #include "../../Drivers/Services/serv-time.h"
-// #include "../Adapters/adapter-lfs.h"
-// #include "../Middlewares/Third_Party/LittleFs/lfs.h"
-// #include "FreeRTOS.h"
-// #include "app-intf.h"
-// #include "app-shell.h"
-// #include "octospi.h"
-// #include "semphr.h"
-
 /* I. interface */
 #include "app-intf.h"
 
 /* II. OS */
 
-
 /* III. middlewares */
 #include "app-console.h"
+#include "app-shell.h"
 #include "../Adapters/adapter-lfs.h"
 
 /* IV. drivers */
@@ -60,12 +50,14 @@ enum class FsOptEnum {
     NONE,
     DIR_OPEN,
     DIR_READ,
+    DIR_MAKE,
     FILE_OPEN,
     FILE_READ,
     FILE_WRITE,
     FILE_WRITE_AND_MAKE,
     FILE_CREATE_NEW,
     FILE_APPEND,
+    REMOVE,
 };
 
 /*-------- 3. interface ---------------------------------------------------------------------------------------------*/
@@ -149,6 +141,9 @@ class FileApp : public StaticAppBase {
     int16_t readDir(const char *path, uint8_t *buffer, uint16_t bufferLen) const;
     int8_t remove(const char* path);
     int8_t makeDir(const char* path);
+
+    int8_t openDir(const char *path);
+
     int8_t rename(const char* path);
     int8_t state(const char* path);
     int8_t sysVolume();

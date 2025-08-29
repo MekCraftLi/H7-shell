@@ -61,7 +61,7 @@ int LfsAdapter::read(const struct lfs_config* c, lfs_block_t block, lfs_off_t of
 
     static_cast<void>(c);
     uint32_t addr = block * LFS_BLOCK_SIZE + off;
-    auto ret = _w25qxx->readData(addr, buffer, size);
+    auto ret = _w25qxx->fastReadQuadOutput(addr, buffer, size);
 
     if (ret != W25QxxErr::SUCCESS) {
         return LFS_ERR_IO;
